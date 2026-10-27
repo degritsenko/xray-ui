@@ -43,8 +43,6 @@ Edit existing entries instead of duplicating them. These commands assume an exis
 | `SUBSCRIPTION_URL_2` | `https://another-provider.example/sub/YOUR_TOKEN` (optional; up to `_16`) |
 | `PANEL_PASSWORD` | `REPLACE_WITH_A_LONG_RANDOM_PASSWORD` |
 | `SUBSCRIPTION_REFRESH_SECONDS` | `43200` |
-| `SERVER_NAME` | `mac` (optional preferred server name) |
-| `SERVER_ID` | Server ID (optional; use instead of `SERVER_NAME`) |
 | `PANEL_ADDRESS` | `0.0.0.0:8080` |
 | `PROBE_URL` | `https://www.gstatic.com/generate_204` |
 

@@ -156,7 +156,7 @@ func (s *Store) LoadOrImport(env func(string) string) (State, error) {
 		if !validText(name) || len(name) > 160 {
 			return state, errors.New("invalid subscription name in environment variables")
 		}
-		interval := int64(43200)
+		interval := int64(600)
 		value := env("SUBSCRIPTION_REFRESH_SECONDS" + suffix)
 		if value == "" {
 			value = env("SUBSCRIPTION_REFRESH_SECONDS")

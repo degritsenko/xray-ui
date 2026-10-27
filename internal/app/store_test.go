@@ -127,3 +127,19 @@ func TestDefaultSubscriptionNamesAreNumbered(t *testing.T) {
 		t.Fatalf("unexpected source names: %q, %q", state.Subscriptions[0].Name, state.Subscriptions[1].Name)
 	}
 }
+
+func TestDefaultRefreshIntervalIsTenMinutes(t *testing.T) {
+	env := map[string]string{"SUBSCRIPTION_URL": "https://example.com/one", "SUBSCRIPTION_URL_2": "https://example.com/two"}
+	store := NewStore(t.TempDir())
+	for boot := 0; boot < 2; boot++ {
+		state, err := store.LoadOrImport(func(k string) string { return env[k] })
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, sub := range state.Subscriptions {
+			if sub.IntervalSeconds != 600 {
+				t.Fatalf("expected 600 seconds, got %d", sub.IntervalSeconds)
+			}
+		}
+	}
+}

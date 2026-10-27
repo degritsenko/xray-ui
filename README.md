@@ -37,16 +37,20 @@ Edit existing entries instead of duplicating them. These commands assume an exis
 
 ## Settings
 
-| Variable | Default / purpose |
+| Key | Value |
 |---|---|
-| `SUBSCRIPTION_URL`, `SUBSCRIPTION_URL_2` … `_16` | HTTPS subscription URLs |
-| `PANEL_PASSWORD` | 12–256 characters; if omitted, printed once in the first-start container log |
-| `SUBSCRIPTION_REFRESH_SECONDS` | `43200` (12 hours); `0` disables scheduled refresh |
-| `SERVER_NAME` or `SERVER_ID` | Optional preferred initial server; set only one |
+| `SUBSCRIPTION_URL` | `https://provider.example/sub/YOUR_TOKEN` |
+| `SUBSCRIPTION_URL_2` | `https://another-provider.example/sub/YOUR_TOKEN` (optional; up to `_16`) |
+| `PANEL_PASSWORD` | `REPLACE_WITH_A_LONG_RANDOM_PASSWORD` |
+| `SUBSCRIPTION_REFRESH_SECONDS` | `43200` |
+| `SERVER_NAME` | `mac` (optional preferred server name) |
+| `SERVER_ID` | Server ID (optional; use instead of `SERVER_NAME`) |
 | `PANEL_ADDRESS` | `0.0.0.0:8080` |
 | `PROBE_URL` | `https://www.gstatic.com/generate_204` |
-| `SUBSCRIPTION_USER_AGENT` | `xray-mikrotik` (retained for provider compatibility) |
-| `STATE_DIR` | `/opt/xray/state` |
+
+`PANEL_PASSWORD` sets the sign-in password; it does not disable the login form. If omitted, a random password is generated and printed once in the first-start container log.
+
+Keys are case-sensitive: use `PANEL_PASSWORD`, not `panel_password`. Passwords must contain 12–256 characters. Restart the container after changing environment values. `SUBSCRIPTION_REFRESH_SECONDS=0` disables scheduled refresh.
 
 Supports plain-text and Base64 `vless://` subscriptions: **IPv4, TCP/RAW + REALITY**, with optional `xtls-rprx-vision`. Other protocols/transports are skipped. Source names come from `profile-title`, falling back to the subscription hostname.
 

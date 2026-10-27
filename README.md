@@ -23,11 +23,11 @@ Optional second subscription:
 /container/envs/add list=xray-panel key=SUBSCRIPTION_URL_2 value="https://another-provider.example/sub/YOUR_TOKEN"
 ```
 
-Create the container after building and publishing the image below:
+Create the container:
 
 ```routeros
 /container/config/set registry-url=https://registry-1.docker.io
-/container/add name=xray-panel remote-image=gritsenko/xray-panel:test interface=xray-veth envlists=xray-panel dns=172.18.20.5 root-dir=/docker/xray-panel logging=yes start-on-boot=yes
+/container/add name=xray-panel remote-image=gritsenko/xray-panel:latest interface=xray-veth envlists=xray-panel dns=172.18.20.5 root-dir=/docker/xray-panel logging=yes start-on-boot=yes
 /container/start [find where name="xray-panel"]
 ```
 
@@ -35,7 +35,7 @@ Open **http://172.18.20.6:8080** and sign in with `PANEL_PASSWORD`. Use a passwo
 
 Edit existing entries instead of duplicating them. These commands assume an existing container network; they do not configure MikroTik firewall, NAT or VPN traffic routing. Mount persistent storage at `/opt/xray/state` to retain the password and selected server when replacing the container.
 
-## Settings
+## Environment variables
 
 | Key | Value |
 |---|---|
@@ -63,7 +63,7 @@ Build one platform locally (replace `linux/arm64` as needed):
 ```sh
 docker buildx build --platform linux/arm64 --target final \
   --provenance=false --sbom=false \
-  -t gritsenko/xray-panel:test --load .
+  -t your_username/xray-panel:test --load .
 ```
 
 Publish all three platforms under one tag. Replace the image name with your Docker Hub repository, then use that same name in `remote-image` on MikroTik:
@@ -72,7 +72,7 @@ Publish all three platforms under one tag. Replace the image name with your Dock
 docker login
 docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 \
   --target final --provenance=false --sbom=false \
-  -t gritsenko/xray-panel:test --push .
+  -t your_username/xray-panel:test --push .
 ```
 
 ARMv5 devices such as hEX Refresh are not supported by this Alpine image.

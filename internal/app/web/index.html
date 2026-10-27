@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark"><title>xray-panel</title>
+<link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script>
+</head>
+<body>
+<section id="login-screen" class="login-screen">
+ <form id="login-form" class="login-card">
+  <h1>Sign in to Xray</h1>
+  <label for="password" class="sr-only">Password</label><input id="password" type="password" placeholder="Password" autocomplete="current-password" required maxlength="256" autofocus>
+  <p id="login-error" class="form-error" role="alert" hidden></p>
+  <button class="primary wide" id="login-button" type="submit">Sign in</button>
+ </form>
+</section>
+<div id="app" class="app" hidden>
+ <header class="topbar"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">↗</span><strong>xray-panel</strong></a><button id="logout" class="quiet">Sign out</button></header>
+ <main class="workspace">
+  <section class="connection-card" aria-label="Current connection">
+   <div class="connection-info"><span id="connection-status" class="status">Not connected</span><h1 id="active-name">Select a server</h1><p id="active-detail" class="muted">No server selected.</p><p id="source-warning" class="inline-warning" hidden>The subscription URL changed. The previous connection is still in use.</p></div>
+   <div class="connection-actions"><button id="core-toggle" class="primary" disabled>Start</button><button id="core-restart" class="secondary" disabled>Restart</button></div>
+  </section>
+  <div id="notice" class="notice" role="status" hidden></div>
+  <div id="busy-bar" class="busy-bar" role="status" hidden><span class="spinner" aria-hidden="true"></span><span id="busy-text">Applying settings…</span></div>
+  <section class="servers" aria-label="Servers">
+   <div class="servers-heading"><div><h2>Servers</h2><p id="subscription-meta" class="hint"></p></div><div class="source-actions"><button id="refresh-source" class="secondary" disabled>Refresh subscription</button><button id="probe-servers" class="secondary" disabled>Check servers</button></div></div>
+   <input id="server-search" type="search" placeholder="Search servers…" aria-label="Search servers" hidden>
+   <div id="server-list" class="server-list"></div>
+   <p id="switch-hint" class="hint switch-hint" hidden>Switching servers may interrupt active connections.</p>
+  </section>
+  <details class="logs"><summary>Event log</summary><pre id="logs" tabindex="0" aria-label="Event log"></pre></details>
+  <footer><span>Subscription URLs are configured through container environment variables.</span><span id="version"></span></footer>
+ </main>
+</div>
+</body>
+</html>

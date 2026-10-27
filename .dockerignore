@@ -1,0 +1,12 @@
+.git
+.github
+.DS_Store
+.env
+.env.*
+*.log
+coverage.out
+state
+dist
+xray-core
+README.md
+THIRD_PARTY.md

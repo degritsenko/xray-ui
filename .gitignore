@@ -1,0 +1,12 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+*.log
+coverage.out
+/manager.json
+/auth.json
+/state/
+/dist/
+/xray-core/
+/xray-manager

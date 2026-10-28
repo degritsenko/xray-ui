@@ -10,7 +10,14 @@ Platforms: **Linux AMD64, ARM64 and ARMv7**. Alpine 3.24.3, Xray 26.9.9.
 
 ## Run on MikroTik
 
-Requires RouterOS 7 with the container package enabled, a working container network and enough storage. The example assumes `xray-veth` is already configured as `172.18.20.6/30`, with gateway/DNS `172.18.20.5`, and VPN traffic is routed to it.
+Create the container network ([RouterOS documentation](https://help.mikrotik.com/docs/spaces/ROS/pages/84901929/Container)):
+
+```routeros
+/interface/bridge/add name=xray-bridge
+/ip/address/add address=172.18.20.5/30 interface=xray-bridge
+/interface/veth/add name=xray-veth address=172.18.20.6/30 gateway=172.18.20.5
+/interface/bridge/port/add bridge=xray-bridge interface=xray-veth
+```
 
 Add the environment variables:
 
@@ -35,7 +42,7 @@ Create the container. Set `PANEL_PASSWORD` to use your own password (4–32 char
 
 Open **http://172.18.20.6:8080** and sign in with your configured password or the generated password from the container log.
 
-Edit existing entries instead of duplicating them. These commands assume an existing container network; they do not configure MikroTik firewall, NAT or VPN traffic routing.
+Edit existing entries instead of duplicating them. Configure firewall, NAT, gateway DNS and VPN traffic routing for your network.
 
 ## Environment variables
 

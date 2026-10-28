@@ -31,24 +31,11 @@ func main() {
 	}
 }
 func run() error {
-	dir := env("STATE_DIR", "/opt/xray/state")
-	store := app.NewStore(dir)
 	command := "serve"
 	if len(os.Args) > 1 {
 		command = os.Args[1]
 	}
 	switch command {
-	case "list":
-		state, err := store.Load()
-		if err != nil {
-			return errors.New("no saved subscriptions")
-		}
-		for _, sub := range state.Subscriptions {
-			for _, node := range sub.Nodes {
-				fmt.Printf("%s\t%s\t%s:%d\n", node.ID, node.Name, node.Server, node.Port)
-			}
-		}
-		return nil
 	case "refresh":
 		data, err := os.ReadFile("/run/xray-manager.pid")
 		if err != nil {
@@ -61,19 +48,17 @@ func run() error {
 		return syscall.Kill(pid, syscall.SIGHUP)
 	case "serve":
 	default:
-		return errors.New("usage: xray-manager [serve|list|refresh]")
+		return errors.New("usage: xray-manager [serve|refresh]")
 	}
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
-	state, err := store.LoadOrImport(os.Getenv)
+	runtime, err := newRuntime(os.Getenv)
 	if err != nil {
-		return fmt.Errorf("could not load settings: %w", err)
+		return fmt.Errorf("could not initialize runtime: %w", err)
 	}
-	auth, generated, err := app.OpenAuth(dir, os.Getenv("PANEL_PASSWORD"))
-	if err != nil {
-		return err
-	}
-	// The initial password is printed only once, outside the browser-visible log buffer.
+	defer os.RemoveAll(runtime.dir)
+	dir, store, state, auth, generated := runtime.dir, runtime.store, runtime.state, runtime.auth, runtime.generated
+	// Generated passwords are printed at startup, outside the browser-visible log buffer.
 	if generated != "" {
 		fmt.Printf("Panel initial password: %s\n", generated)
 	}

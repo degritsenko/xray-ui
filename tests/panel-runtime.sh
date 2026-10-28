@@ -4,7 +4,8 @@ set -eu
 TEST_ROOT=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
 TMP=$(mktemp -d)
 export SUBSCRIPTION_URL=https://198.51.100.20:8443/sub SUBSCRIPTION_NAME="Subscription 1" SUBSCRIPTION_REFRESH_SECONDS=0
-export STATE_DIR="$TMP/state" PANEL_ADDRESS=0.0.0.0:8080 PANEL_PASSWORD=1234
+mkdir -p "$TMP/runtime"
+export TMPDIR="$TMP/runtime" PANEL_ADDRESS=0.0.0.0:8080 PANEL_PASSWORD=1234
 cleanup() {
     [ -z "${MANAGER:-}" ] || kill "$MANAGER" 2>/dev/null || true
     [ -z "${VPN_SERVER:-}" ] || kill "$VPN_SERVER" 2>/dev/null || true
@@ -67,6 +68,5 @@ wait "$MANAGER"; MANAGER=
 wait "$CLIENT"
 kill "$VPN_SERVER"; wait "$VPN_SERVER" || true; VPN_SERVER=
 if pgrep -x xray >/dev/null; then echo 'orphaned Xray'; exit 1; fi
-[ "$(stat -c %a "$STATE_DIR/manager.json")" = 600 ]
-[ "$(stat -c %a "$STATE_DIR/auth.json")" = 600 ]
+[ -z "$(find "$TMP/runtime" -mindepth 1 -print -quit)" ]
 echo 'panel runtime integration passed'

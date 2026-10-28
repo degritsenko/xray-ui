@@ -25,7 +25,7 @@ Optional second subscription:
 /container/envs/add list=xray-ui key=SUBSCRIPTION_URL_2 value="https://another-provider.example/sub/YOUR_TOKEN"
 ```
 
-Create the container. Set `PANEL_PASSWORD` to use your own password (4–32 characters), or omit it to generate one and print it to stdout on first start (the MikroTik container log):
+Create the container. Set `PANEL_PASSWORD` to use your own password (4–32 characters), or omit it to generate one and print it to stdout at startup (the MikroTik container log):
 
 ```routeros
 /container/config/set registry-url=https://registry-1.docker.io
@@ -35,7 +35,7 @@ Create the container. Set `PANEL_PASSWORD` to use your own password (4–32 char
 
 Open **http://172.18.20.6:8080** and sign in with your configured password or the generated password from the container log.
 
-Edit existing entries instead of duplicating them. These commands assume an existing container network; they do not configure MikroTik firewall, NAT or VPN traffic routing. Mount persistent storage at `/opt/xray/state` to retain the password and selected server when replacing the container.
+Edit existing entries instead of duplicating them. These commands assume an existing container network; they do not configure MikroTik firewall, NAT or VPN traffic routing.
 
 ## Environment variables
 
@@ -48,13 +48,13 @@ Edit existing entries instead of duplicating them. These commands assume an exis
 | `PANEL_ADDRESS` | `0.0.0.0:8080` |
 | `PROBE_URL` | `https://www.gstatic.com/generate_204` |
 
-`PANEL_PASSWORD`: if set, uses that password; otherwise generates one and prints it to stdout on first start. Saved passwords are reused on restart. Passwords must contain 4–32 characters. Restart the container after changing environment variables.
+`PANEL_PASSWORD`: if set, uses that password; otherwise generates one and prints it to stdout at startup. Passwords must contain 4–32 characters. Restart the container after changing environment variables.
 
 `SUBSCRIPTION_REFRESH_SECONDS=0` disables scheduled refresh.
 
 Supports plain-text and Base64 `vless://` subscriptions: **IPv4, TCP/RAW + REALITY**, with optional `xtls-rprx-vision`. Other protocols/transports are skipped. Source names come from `profile-title`, falling back to the subscription hostname.
 
-Startup connects to the saved server if reachable, otherwise the first working server as subscriptions are loaded. Later slow sources do not delay an available connection. Explicit Stop remains stopped across restarts. Failed updates retain the previous configuration. Switching servers can interrupt connections. Latency is an HTTPS request through the VPN, not a bandwidth test.
+Startup loads subscriptions from environment variables and connects to the first working server. Later slow sources do not delay an available connection. Failed updates retain the previous configuration. Switching servers can interrupt connections. Latency is an HTTPS request through the VPN, not a bandwidth test.
 
 ## Build your own image
 

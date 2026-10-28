@@ -48,7 +48,7 @@ connection.close()
 initial = call('GET', '/api/state')
 assert initial['coreVersion'] == '26.9.9', 'installed Xray version missing'
 csrf = initial['csrf']
-if phase in ('first', 'source-change'):
+if phase in ('first', 'second', 'source-change'):
     for _ in range(120):
         state = call('GET', '/api/state')
         if state['running'] and not state.get('probing'):
@@ -83,9 +83,9 @@ if phase == 'first':
     print('panel lifecycle and off-subnet routing passed', flush=True)
 elif phase == 'second':
     state = call('GET', '/api/state')
-    assert not state['running'] and not state['active']['enabled'], 'boot ignored Stop'
-    sub = (root / 'sub-id').read_text()
-    call('POST', '/api/xray/start')
+    assert state['running'] and state['active']['enabled'], 'fresh startup did not connect'
+    sub = state['subscriptions'][0]['id']
+    assert sub != (root / 'sub-id').read_text(), 'previous runtime state was restored'
     state = call('GET', '/api/state')
     node = state['subscriptions'][0]['nodes'][0]
     call('GET', f'/api/subscriptions/{sub}', expected=404)
@@ -99,7 +99,7 @@ elif phase == 'second':
     assert 'https://198.51.100.20:8443' not in serialized
     call('POST', '/api/logout')
     call('GET', '/api/state', expected=401)
-    print('persistence, read-only sources and secret redaction passed', flush=True)
+    print('fresh startup, read-only sources and secret redaction passed', flush=True)
 elif phase == 'source-change':
     state = call('GET', '/api/state')
     assert state['active']['subscriptionID'] != (root / 'sub-id').read_text(), 'removed env source resumed old selection'

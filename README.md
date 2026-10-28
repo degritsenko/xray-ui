@@ -6,6 +6,8 @@ A complete containerized VPN client: Xray handles traffic through native TUN, wh
 
 Platforms: **Linux AMD64, ARM64 and ARMv7**. Alpine 3.24.3, Xray 26.9.9.
 
+![xray-ui panel](docs/panel.png)
+
 ## Run on MikroTik
 
 Requires RouterOS 7 with the container package enabled, a working container network and enough storage. The example assumes `xray-veth` is already configured as `172.18.20.6/30`, with gateway/DNS `172.18.20.5`, and VPN traffic is routed to it.
@@ -23,7 +25,7 @@ Optional second subscription:
 /container/envs/add list=xray-ui key=SUBSCRIPTION_URL_2 value="https://another-provider.example/sub/YOUR_TOKEN"
 ```
 
-Create the container:
+Create the container. Set `PANEL_PASSWORD` to use your own password (4–32 characters), or omit it to generate one and print it to stdout on first start (the MikroTik container log):
 
 ```routeros
 /container/config/set registry-url=https://registry-1.docker.io
@@ -31,7 +33,7 @@ Create the container:
 /container/start [find where name="xray-ui"]
 ```
 
-Open **http://172.18.20.6:8080** and sign in with `PANEL_PASSWORD`. New passwords must contain 4–32 characters. Keep the panel accessible only from your trusted network.
+Open **http://172.18.20.6:8080** and sign in with your configured password or the generated password from the container log.
 
 Edit existing entries instead of duplicating them. These commands assume an existing container network; they do not configure MikroTik firewall, NAT or VPN traffic routing. Mount persistent storage at `/opt/xray/state` to retain the password and selected server when replacing the container.
 
@@ -46,11 +48,9 @@ Edit existing entries instead of duplicating them. These commands assume an exis
 | `PANEL_ADDRESS` | `0.0.0.0:8080` |
 | `PROBE_URL` | `https://www.gstatic.com/generate_204` |
 
-The standard sign-in form supports browser password managers; the browser decides whether to offer saving a password.
+`PANEL_PASSWORD`: if set, uses that password; otherwise generates one and prints it to stdout on first start. Saved passwords are reused on restart. Passwords must contain 4–32 characters. Restart the container after changing environment variables.
 
-`PANEL_PASSWORD` sets the sign-in password; it does not disable the login form. If omitted, a random password is generated and printed once in the first-start container log.
-
-Keys are case-sensitive: use `PANEL_PASSWORD`, not `panel_password`. New `PANEL_PASSWORD` values must contain 4–32 characters. Previously saved passwords remain usable until changed. Restart the container after changing environment values. `SUBSCRIPTION_REFRESH_SECONDS=0` disables scheduled refresh.
+`SUBSCRIPTION_REFRESH_SECONDS=0` disables scheduled refresh.
 
 Supports plain-text and Base64 `vless://` subscriptions: **IPv4, TCP/RAW + REALITY**, with optional `xtls-rprx-vision`. Other protocols/transports are skipped. Source names come from `profile-title`, falling back to the subscription hostname.
 

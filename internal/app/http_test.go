@@ -206,3 +206,23 @@ func TestNativeSignInRejectsCrossOriginAndWrongPassword(t *testing.T) {
 		}
 	}
 }
+
+// Native form POSTs retain their Origin only with a compatible referrer policy.
+func TestSignInPagePreservesSameOriginFormOrigin(t *testing.T) {
+	s, _ := setupHTTP(t)
+	for _, path := range []string{"/", "/login"} {
+		r, err := s.Client().Get(s.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		r.Body.Close()
+		if got := r.Header.Get("Referrer-Policy"); got != "same-origin" {
+			t.Fatalf("%s: referrer policy %q makes native sign-in send Origin: null", path, got)
+		}
+	}
+	r := request(t, s.Client(), "POST", s.URL+"/api/login", `{"password":"`+testPassword+`"}`, nil, "", "null")
+	defer r.Body.Close()
+	if r.StatusCode != http.StatusForbidden {
+		t.Fatal("opaque origins must remain rejected")
+	}
+}

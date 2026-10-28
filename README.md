@@ -10,13 +10,11 @@ Platforms: **Linux AMD64, ARM64 and ARMv7**. Alpine 3.24.3, Xray 26.9.9.
 
 ## Run on MikroTik
 
-Create the container network ([RouterOS documentation](https://help.mikrotik.com/docs/spaces/ROS/pages/84901929/Container)):
+Create the container interface and assign the gateway address directly to it:
 
 ```routeros
-/interface/bridge/add name=xray-bridge
-/ip/address/add address=172.18.20.5/30 interface=xray-bridge
 /interface/veth/add name=xray-veth address=172.18.20.6/30 gateway=172.18.20.5
-/interface/bridge/port/add bridge=xray-bridge interface=xray-veth
+/ip/address/add address=172.18.20.5/30 interface=xray-veth
 ```
 
 Add the environment variables:

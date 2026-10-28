@@ -14,7 +14,7 @@ Add the environment variables:
 
 ```routeros
 /container/envs/add list=xray-ui key=SUBSCRIPTION_URL value="https://provider.example/sub/YOUR_TOKEN"
-/container/envs/add list=xray-ui key=PANEL_PASSWORD value="REPLACE_WITH_A_LONG_RANDOM_PASSWORD"
+/container/envs/add list=xray-ui key=PANEL_PASSWORD value="REPLACE_WITH_YOUR_PASSWORD"
 ```
 
 Optional second subscription:
@@ -31,7 +31,7 @@ Create the container:
 /container/start [find where name="xray-ui"]
 ```
 
-Open **http://172.18.20.6:8080** and sign in with `PANEL_PASSWORD`. Use a password of at least 12 characters. Keep the panel accessible only from your trusted network.
+Open **http://172.18.20.6:8080** and sign in with `PANEL_PASSWORD`. New passwords must contain 4–32 characters. Keep the panel accessible only from your trusted network.
 
 Edit existing entries instead of duplicating them. These commands assume an existing container network; they do not configure MikroTik firewall, NAT or VPN traffic routing. Mount persistent storage at `/opt/xray/state` to retain the password and selected server when replacing the container.
 
@@ -41,14 +41,16 @@ Edit existing entries instead of duplicating them. These commands assume an exis
 |---|---|
 | `SUBSCRIPTION_URL` | `https://provider.example/sub/YOUR_TOKEN` |
 | `SUBSCRIPTION_URL_2` | `https://another-provider.example/sub/YOUR_TOKEN` (optional; up to `_16`) |
-| `PANEL_PASSWORD` | `REPLACE_WITH_A_LONG_RANDOM_PASSWORD` |
+| `PANEL_PASSWORD` | `REPLACE_WITH_YOUR_PASSWORD` |
 | `SUBSCRIPTION_REFRESH_SECONDS` | `600` (10 minutes, default) |
 | `PANEL_ADDRESS` | `0.0.0.0:8080` |
 | `PROBE_URL` | `https://www.gstatic.com/generate_204` |
 
+The standard sign-in form supports browser password managers; the browser decides whether to offer saving a password.
+
 `PANEL_PASSWORD` sets the sign-in password; it does not disable the login form. If omitted, a random password is generated and printed once in the first-start container log.
 
-Keys are case-sensitive: use `PANEL_PASSWORD`, not `panel_password`. Passwords must contain 12–256 characters. Restart the container after changing environment values. `SUBSCRIPTION_REFRESH_SECONDS=0` disables scheduled refresh.
+Keys are case-sensitive: use `PANEL_PASSWORD`, not `panel_password`. New `PANEL_PASSWORD` values must contain 4–32 characters. Previously saved passwords remain usable until changed. Restart the container after changing environment values. `SUBSCRIPTION_REFRESH_SECONDS=0` disables scheduled refresh.
 
 Supports plain-text and Base64 `vless://` subscriptions: **IPv4, TCP/RAW + REALITY**, with optional `xtls-rprx-vision`. Other protocols/transports are skipped. Source names come from `profile-title`, falling back to the subscription hostname.
 

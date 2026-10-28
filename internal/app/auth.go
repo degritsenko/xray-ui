@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
 const passwordRounds = 600000
@@ -55,8 +56,8 @@ func OpenAuth(dir, password string) (*Auth, string, error) {
 			err = errors.New("reset required")
 		}
 	}
-	if password != "" && (len(password) < 12 || len(password) > 256) {
-		return nil, "", errors.New("PANEL_PASSWORD must contain 12 to 256 characters")
+	if password != "" && !validPanelPassword(password) {
+		return nil, "", errors.New("PANEL_PASSWORD must contain 4 to 32 characters")
 	}
 	if err != nil || password != "" && !a.checkPassword(password) {
 		if password == "" {
@@ -76,6 +77,8 @@ func OpenAuth(dir, password string) (*Auth, string, error) {
 	return a, generated, nil
 }
 func (a *Auth) checkPassword(password string) bool {
+	// New configured passwords follow the current policy. Existing hashes may
+	// belong to passwords accepted by an older version; keep those usable.
 	if len(password) > 256 || a.record.Rounds != passwordRounds {
 		return false
 	}
@@ -148,3 +151,11 @@ func (a *Auth) session(token string) (webSession, bool) {
 	return s, ok
 }
 func (a *Auth) logout(token string) { a.mu.Lock(); defer a.mu.Unlock(); delete(a.sessions, token) }
+
+func validPanelPassword(password string) bool {
+	if !utf8.ValidString(password) {
+		return false
+	}
+	length := utf8.RuneCountInString(password)
+	return length >= 4 && length <= 32
+}

@@ -73,11 +73,6 @@ function render(){
  $('version').textContent=`xray-ui · ${state.version}`;
  if(state.lastError&&!$('notice').textContent)notice(state.lastError,true);
 }
-$('login-form').addEventListener('submit',async event=>{event.preventDefault();$('login-button').disabled=true;$('login-error').hidden=true;
- try{const result=await api('/login',{method:'POST',body:{password:$('password').value}});authGeneration++;csrf=result.csrf;$('password').value='';await load()}
- catch(error){$('login-error').textContent=error.message;$('login-error').hidden=false}
- finally{$('login-button').disabled=false}
-});
 $('logout').addEventListener('click',async()=>{try{await api('/logout',{method:'POST',body:{}});showLogin()}catch(error){notice(error.message,true)}});
 $('core-toggle').addEventListener('click',()=>{const running=state?.running;action(()=>api(`/xray/${running?'stop':'start'}`,{method:'POST',body:{}}),running?'Xray stopped':'Xray started',running?'Stopping Xray…':'Starting Xray…')});
 $('core-restart').addEventListener('click',()=>action(()=>api('/xray/restart',{method:'POST',body:{}}),'Xray restarted','Restarting Xray…'));

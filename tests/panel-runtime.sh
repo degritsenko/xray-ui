@@ -4,7 +4,7 @@ set -eu
 TEST_ROOT=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
 TMP=$(mktemp -d)
 export SUBSCRIPTION_URL=https://198.51.100.20:8443/sub SUBSCRIPTION_NAME="Subscription 1" SUBSCRIPTION_REFRESH_SECONDS=0
-export STATE_DIR="$TMP/state" PANEL_ADDRESS=0.0.0.0:8080 PANEL_PASSWORD=test-panel-password-123
+export STATE_DIR="$TMP/state" PANEL_ADDRESS=0.0.0.0:8080 PANEL_PASSWORD=1234
 cleanup() {
     [ -z "${MANAGER:-}" ] || kill "$MANAGER" 2>/dev/null || true
     [ -z "${VPN_SERVER:-}" ] || kill "$VPN_SERVER" 2>/dev/null || true

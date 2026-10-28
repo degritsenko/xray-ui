@@ -4,6 +4,7 @@ import json
 import pathlib
 import sys
 import time
+import urllib.parse
 
 root = pathlib.Path(sys.argv[1])
 phase = sys.argv[2]
@@ -35,7 +36,15 @@ for _ in range(30):
         time.sleep(.2)
 else:
     raise AssertionError('Panel unavailable from off-subnet peer')
-call('POST', '/api/login', {'password': 'test-panel-password-123'}, auth=False)
+connection = http.client.HTTPConnection('10.200.0.2', 8080, timeout=50,
+                                         source_address=('198.51.100.20', 0))
+connection.request('POST', '/login', body=urllib.parse.urlencode({'username': 'xray-ui', 'password': '1234'}),
+                   headers={'Content-Type': 'application/x-www-form-urlencoded', 'Origin': 'http://10.200.0.2:8080'})
+response = connection.getresponse()
+assert response.status == 303 and response.getheader('Location') == '/', 'native sign-in failed'
+cookie = response.getheader('Set-Cookie').split(';')[0]
+response.read()
+connection.close()
 initial = call('GET', '/api/state')
 assert initial['coreVersion'] == '26.9.9', 'installed Xray version missing'
 csrf = initial['csrf']

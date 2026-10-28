@@ -5,6 +5,7 @@ import (
 	"embed"
 	"encoding/json"
 	"errors"
+	"html"
 	"io"
 	"io/fs"
 	"mime"
@@ -26,6 +27,8 @@ type Server struct {
 func NewServer(manager *Manager, auth *Auth) http.Handler {
 	s := &Server{manager: manager, auth: auth, mux: http.NewServeMux()}
 	s.mux.HandleFunc("POST /api/login", s.login)
+	s.mux.HandleFunc("POST /login", s.formLogin)
+	s.mux.HandleFunc("GET /login", func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, "/", http.StatusSeeOther) })
 	s.mux.HandleFunc("POST /api/logout", s.protected(s.logout))
 	s.mux.HandleFunc("GET /api/state", s.protected(s.state))
 	s.mux.HandleFunc("POST /api/subscriptions/{id}/refresh", s.protected(s.refresh))
@@ -109,17 +112,29 @@ func (s *Server) protected(next func(http.ResponseWriter, *http.Request, webSess
 		next(w, r, session)
 	}
 }
-func (s *Server) login(w http.ResponseWriter, r *http.Request) {
+
+// Both native forms and API clients use the same rate limit and session policy.
+func (s *Server) loginAllowed(r *http.Request) (int, string) {
 	if !sameOrigin(r) {
-		apiError(w, 403, "Request rejected")
-		return
+		return 403, "Request rejected"
 	}
 	ip, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		ip = r.RemoteAddr
 	}
 	if !s.auth.allowLogin(ip) {
-		apiError(w, 429, "Too many attempts; try again in a minute")
+		return 429, "Too many attempts; try again in a minute"
+	}
+	return 0, ""
+}
+func (s *Server) startSession(w http.ResponseWriter, r *http.Request) webSession {
+	session := s.auth.newSession()
+	http.SetCookie(w, &http.Cookie{Name: "xray_session", Value: session.Token, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode, Secure: r.TLS != nil, MaxAge: int(sessionLifetime.Seconds())})
+	return session
+}
+func (s *Server) login(w http.ResponseWriter, r *http.Request) {
+	if code, message := s.loginAllowed(r); code != 0 {
+		apiError(w, code, message)
 		return
 	}
 	var body struct {
@@ -133,9 +148,41 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		apiError(w, 401, "Incorrect password")
 		return
 	}
-	session := s.auth.newSession()
-	http.SetCookie(w, &http.Cookie{Name: "xray_session", Value: session.Token, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode, Secure: r.TLS != nil, MaxAge: int(sessionLifetime.Seconds())})
+	session := s.startSession(w, r)
 	writeJSON(w, 200, map[string]string{"csrf": session.CSRF})
+}
+func (s *Server) loginPage(w http.ResponseWriter, code int, message string) {
+	page, err := webFiles.ReadFile("web/index.html")
+	if err != nil {
+		http.Error(w, "Sign-in page unavailable", 500)
+		return
+	}
+	markup := strings.Replace(string(page), `<p id="login-error" class="form-error" role="alert" hidden></p>`, `<p id="login-error" class="form-error" role="alert">`+html.EscapeString(message)+`</p>`, 1)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(code)
+	_, _ = io.WriteString(w, markup)
+}
+func (s *Server) formLogin(w http.ResponseWriter, r *http.Request) {
+	if code, message := s.loginAllowed(r); code != 0 {
+		s.loginPage(w, code, message)
+		return
+	}
+	media, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if err != nil || media != "application/x-www-form-urlencoded" {
+		s.loginPage(w, 400, "Invalid request")
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 16384)
+	if err = r.ParseForm(); err != nil || len(r.PostForm["password"]) != 1 {
+		s.loginPage(w, 400, "Invalid request")
+		return
+	}
+	if !s.auth.checkPassword(r.PostForm.Get("password")) {
+		s.loginPage(w, 401, "Incorrect password")
+		return
+	}
+	s.startSession(w, r)
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 func (s *Server) logout(w http.ResponseWriter, r *http.Request, session webSession) {
 	var empty struct{}

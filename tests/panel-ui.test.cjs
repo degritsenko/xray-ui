@@ -66,3 +66,19 @@ test('logout must ignore a state response already in flight after probe finishes
  f.releaseState();await checking;
  assert.equal(f.ids.get('app').hidden,true,'stale state response reopened authenticated panel after logout');
 });
+
+test('sign-in uses a native named form with password-manager autocomplete hints',()=>{
+ const html=fs.readFileSync(path.join(__dirname,'../internal/app/web/index.html'),'utf8');
+ const form=html.match(/<form\b[^>]*id="login-form"[^>]*>/)?.[0]||'';
+ assert.match(form,/method="post"/);assert.match(form,/action="\/login"/);
+ const password=html.match(/<input\b[^>]*id="password"[^>]*>/)?.[0]||'';
+ assert.match(password,/name="password"/);assert.match(password,/autocomplete="current-password"/);
+ // This is a sign-in field, not a new-password form. It must also allow
+ // older stored credentials and all 32 Unicode-code-point configured passwords.
+ const maximum=Number(password.match(/maxlength="(\d+)"/)?.[1]);
+ assert.ok(maximum>=256);assert.ok('🔑'.repeat(32).length<=maximum);
+ assert.doesNotMatch(password,/minlength=/);
+ assert.match(html,/<input\b[^>]*name="username"[^>]*autocomplete="username"/);
+ const script=fs.readFileSync(path.join(__dirname,'../internal/app/web/app.js'),'utf8');
+ assert.doesNotMatch(script,/\$\('login-form'\)\.addEventListener\('submit'/,'native submit must reach the browser');
+});

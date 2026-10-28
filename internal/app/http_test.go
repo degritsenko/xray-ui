@@ -151,3 +151,58 @@ func TestOversizedControlRequestDoesNotMutate(t *testing.T) {
 		t.Fatal("oversized request mutated core state")
 	}
 }
+
+func TestNativeSignInRedirectsAndSetsSession(t *testing.T) {
+	m, _, _, _ := testManager(t)
+	auth, _, err := OpenAuth(t.TempDir(), "1234")
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(NewServer(m, auth))
+	defer server.Close()
+	client := server.Client()
+	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	req, err := http.NewRequest("POST", server.URL+"/login", strings.NewReader("username=xray-ui&password=1234"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Origin", server.URL)
+	response, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != 303 || response.Header.Get("Location") != "/" || len(response.Cookies()) != 1 {
+		t.Fatal("native form did not redirect with session", response.StatusCode)
+	}
+	cookie := response.Cookies()[0]
+	if !cookie.HttpOnly || cookie.SameSite != http.SameSiteStrictMode {
+		t.Fatal("unsafe form login cookie")
+	}
+	state := request(t, client, "GET", server.URL+"/api/state", "", cookie, "", "")
+	defer state.Body.Close()
+	if state.StatusCode != 200 {
+		t.Fatal("native form session unusable")
+	}
+}
+func TestNativeSignInRejectsCrossOriginAndWrongPassword(t *testing.T) {
+	server, _ := setupHTTP(t)
+	for _, tc := range []struct {
+		origin, password string
+		want             int
+	}{{"https://evil.example", testPassword, 403}, {server.URL, "wrong-password", 401}} {
+		req, _ := http.NewRequest("POST", server.URL+"/login", strings.NewReader("password="+tc.password))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Origin", tc.origin)
+		response, err := server.Client().Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(response.Body)
+		response.Body.Close()
+		if response.StatusCode != tc.want || len(response.Cookies()) != 0 || !bytes.Contains(body, []byte("Sign in to Xray")) {
+			t.Fatalf("unexpected failed form login: %d", response.StatusCode)
+		}
+	}
+}

@@ -1,8 +1,8 @@
 # xray-panel
 
-Lightweight VLESS REALITY control panel for MikroTik.
+Ready-to-run VLESS REALITY solution for MikroTik, powered by Xray with native TUN and a web panel.
 
-A small dark web panel for selecting servers, refreshing subscriptions and checking VPN latency. Uses Xray with native TUN. Subscription URLs are configured only through container environment variables.
+A complete containerized VPN client: Xray handles traffic through native TUN, while the dark web panel manages subscriptions, server selection and latency checks. Subscription URLs are configured only through container environment variables.
 
 Platforms: **Linux AMD64, ARM64 and ARMv7**. Alpine 3.24.3, Xray 26.9.9.
 
@@ -52,7 +52,7 @@ Keys are case-sensitive: use `PANEL_PASSWORD`, not `panel_password`. Passwords m
 
 Supports plain-text and Base64 `vless://` subscriptions: **IPv4, TCP/RAW + REALITY**, with optional `xtls-rprx-vision`. Other protocols/transports are skipped. Source names come from `profile-title`, falling back to the subscription hostname.
 
-Startup connects to the saved server if reachable, otherwise the first working server. Explicit Stop remains stopped across restarts. Failed updates retain the previous configuration. Switching servers can interrupt connections. Latency is an HTTPS request through the VPN, not a bandwidth test.
+Startup connects to the saved server if reachable, otherwise the first working server as subscriptions are loaded. Later slow sources do not delay an available connection. Explicit Stop remains stopped across restarts. Failed updates retain the previous configuration. Switching servers can interrupt connections. Latency is an HTTPS request through the VPN, not a bandwidth test.
 
 ## Build your own image
 
@@ -82,6 +82,7 @@ ARMv5 devices such as hEX Refresh are not supported by this Alpine image.
 ```sh
 go test -race ./...
 go vet ./...
+node --test tests/panel-ui.test.cjs
 ```
 
 Optional network integration test inside a disposable privileged container:

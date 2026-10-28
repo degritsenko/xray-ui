@@ -101,6 +101,7 @@ func ParseSubscription(data []byte) ([]Node, int, error) {
 	}
 	var nodes []Node
 	skipped := 0
+	seen := make(map[string]bool)
 	for _, line := range strings.Split(text, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -111,6 +112,10 @@ func ParseSubscription(data []byte) ([]Node, int, error) {
 			skipped++
 			continue
 		}
+		if seen[n.ID] {
+			continue
+		}
+		seen[n.ID] = true
 		nodes = append(nodes, n)
 		if len(nodes) > MaxNodes {
 			return nil, skipped, errors.New("too many servers in subscription")

@@ -325,3 +325,99 @@ func TestManualActionDuringOnlyProbeDoesNotReportFailure(t *testing.T) {
 		t.Fatal("manual success reported as startup failure")
 	}
 }
+
+type delayedSecondSource struct {
+	*testRuntime
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (r *delayedSecondSource) Download(ctx context.Context, u, ua string) ([]byte, error) {
+	if strings.Contains(u, "second") {
+		close(r.entered)
+		select {
+		case <-r.release:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+	return r.testRuntime.Download(ctx, u, ua)
+}
+func TestFreshStartupConnectsBeforeFetchingSlowLaterSource(t *testing.T) {
+	store := NewStore(t.TempDir())
+	env := map[string]string{"SUBSCRIPTION_URL": "https://first.example/sub", "SUBSCRIPTION_URL_2": "https://second.example/sub"}
+	state, err := store.LoadOrImport(func(k string) string { return env[k] })
+	if err != nil {
+		t.Fatal(err)
+	}
+	network := &delayedSecondSource{testRuntime: &testRuntime{body: sampleURI}, entered: make(chan struct{}), release: make(chan struct{})}
+	core := &testCore{}
+	m := NewManager(store, state, network, core, NewLogBuffer(nil))
+	m.SetProber(&fakeProber{})
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- m.Bootstrap(ctx) }()
+	select {
+	case <-network.entered:
+	case <-ctx.Done():
+		t.Fatal("second fetch not reached")
+	}
+	// Channel close happens after first-source activation and before the delayed download.
+	connected := core.Running()
+	close(network.release)
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if !connected {
+		t.Fatal("slow second source delayed first-source VPN connection")
+	}
+	if m.stateCopy().Active.SubscriptionID != state.Subscriptions[0].ID {
+		t.Fatal("later source overrode working connection")
+	}
+}
+
+func TestProbeAllLeavesControlResponsive(t *testing.T) {
+	m, network, core, id := testManager(t)
+	network.body = sampleURI + "\n" + stringsReplaceServer(sampleURI)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if err := m.Refresh(ctx, id); err != nil {
+		t.Fatal(err)
+	}
+	nodes := m.stateCopy().Subscriptions[0].Nodes
+	if err := m.Activate(ctx, id, nodes[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	p := &blockingProber{entered: make(chan struct{}), release: make(chan struct{})}
+	m.SetProber(p)
+	done := make(chan error, 1)
+	go func() { done <- m.ProbeAll(ctx) }()
+	<-p.entered
+	if !m.Snapshot().Probing {
+		t.Fatal("check status missing")
+	}
+	controlled := make(chan error, 1)
+	go func() { controlled <- m.Control(ctx, "stop") }()
+	select {
+	case err := <-controlled:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-ctx.Done():
+		t.Fatal("Stop blocked by probe")
+	}
+	if core.Running() {
+		t.Fatal("Stop did not stop VPN")
+	}
+	if err := m.Activate(ctx, id, nodes[1].ID); err != nil {
+		t.Fatal(err)
+	}
+	close(p.release)
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if !core.Running() || m.stateCopy().Active.Node.ID != nodes[1].ID {
+		t.Fatal("probe changed manual choice")
+	}
+}

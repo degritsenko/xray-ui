@@ -122,61 +122,60 @@ func (m *Manager) bootstrapProbed(ctx context.Context) error {
 			connected = activate(initial.Active.SubscriptionID, initial.Active.Node)
 		}
 	}
-	for _, sub := range m.stateCopy().Subscriptions {
+	// Try each source as soon as it is loaded. Later slow downloads must not
+	// postpone an available connection from an earlier source.
+	for _, source := range m.stateCopy().Subscriptions {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		if err := m.refresh(ctx, sub.ID, connected); err != nil {
+		if err := m.refresh(ctx, source.ID, connected); err != nil {
 			m.SetError(err.Error())
 		}
-	}
-	m.op.Lock()
-	s := m.stateCopy()
-	manual := m.intent != intent
-	m.op.Unlock()
-	stopped := s.Active != nil && !s.Active.Enabled
-	type candidate struct {
-		sub  string
-		node Node
-	}
-	var candidates []candidate
-	seen := map[string]bool{}
-	add := func(id string, n Node) {
-		key := id + "/" + n.ID
-		if !seen[key] {
-			seen[key] = true
-			candidates = append(candidates, candidate{id, n})
+		if connected {
+			continue
 		}
-	}
-	if !connected && !stopped && !manual {
-		if s.Active != nil {
+		m.op.Lock()
+		s := m.stateCopy()
+		manual := m.intent != intent
+		m.op.Unlock()
+		if manual || (s.Active != nil && !s.Active.Enabled) {
+			continue
+		}
+		index, err := findSub(s, source.ID)
+		if err != nil {
+			continue
+		}
+		sub := s.Subscriptions[index]
+		var candidates []Node
+		seen := map[string]bool{}
+		add := func(n Node) {
+			if !seen[n.ID] {
+				seen[n.ID] = true
+				candidates = append(candidates, n)
+			}
+		}
+		if s.Active != nil && s.Active.SubscriptionID == source.ID {
 			n := s.Active.Node
-			if i, err := findSub(s, s.Active.SubscriptionID); err == nil {
-				var updated Node
-				if s.Active.ByName {
-					updated, err = SelectNode(s.Subscriptions[i].Nodes, n.Name, "")
-				} else {
-					updated, err = SelectNode(s.Subscriptions[i].Nodes, "", n.ID)
-				}
-				if err == nil {
-					n = updated
-				}
+			var updated Node
+			if s.Active.ByName {
+				updated, err = SelectNode(sub.Nodes, n.Name, "")
+			} else {
+				updated, err = SelectNode(sub.Nodes, "", n.ID)
 			}
-			add(s.Active.SubscriptionID, n)
+			if err == nil {
+				n = updated
+			}
+			add(n)
 		}
-		for _, sub := range s.Subscriptions {
-			if sub.BootstrapName != "" || sub.BootstrapID != "" {
-				if n, err := SelectNode(sub.Nodes, sub.BootstrapName, sub.BootstrapID); err == nil {
-					add(sub.ID, n)
-				}
+		if sub.BootstrapName != "" || sub.BootstrapID != "" {
+			if n, e := SelectNode(sub.Nodes, sub.BootstrapName, sub.BootstrapID); e == nil {
+				add(n)
 			}
 		}
-		for _, sub := range s.Subscriptions {
-			for _, n := range sub.Nodes {
-				add(sub.ID, n)
-			}
+		for _, n := range sub.Nodes {
+			add(n)
 		}
-		for _, c := range candidates {
+		for _, n := range candidates {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
@@ -184,10 +183,9 @@ func (m *Manager) bootstrapProbed(ctx context.Context) error {
 			changed := m.intent != intent
 			m.op.Unlock()
 			if changed {
-				manual = true
 				break
 			}
-			if check(c.sub, c.node) && activate(c.sub, c.node) {
+			if check(source.ID, n) && activate(source.ID, n) {
 				connected = true
 				break
 			}
@@ -206,10 +204,10 @@ func (m *Manager) bootstrapProbed(ctx context.Context) error {
 	}
 	m.op.Lock()
 	latest := m.stateCopy()
-	manual = manual || m.intent != intent
-	stopped = latest.Active != nil && !latest.Active.Enabled
+	manual := m.intent != intent
+	stopped := latest.Active != nil && !latest.Active.Enabled
 	m.op.Unlock()
-	if !connected && !stopped && !manual && len(s.Subscriptions) > 0 {
+	if !connected && !stopped && !manual && len(latest.Subscriptions) > 0 {
 		err := errors.New("no reachable VPN server found; check servers in the panel")
 		m.SetError(err.Error())
 		return err

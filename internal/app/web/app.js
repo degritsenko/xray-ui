@@ -1,18 +1,19 @@
 'use strict';
 const $=id=>document.getElementById(id);
-let state=null,csrf='',busy=false;
+let state=null,csrf='',busy=false,checking=false,probeController=null,authGeneration=0;
 async function api(path,options={}){
- const method=options.method||'GET';
- const response=await fetch('/api'+path,{method,credentials:'same-origin',headers:{'Content-Type':'application/json',...(method!=='GET'?{'X-CSRF-Token':csrf}:{})},...(options.body!==undefined?{body:JSON.stringify(options.body)}:{})});
+ const method=options.method||'GET',generation=authGeneration;
+ const response=await fetch('/api'+path,{method,credentials:'same-origin',headers:{'Content-Type':'application/json',...(method!=='GET'?{'X-CSRF-Token':csrf}:{})},...(options.body!==undefined?{body:JSON.stringify(options.body)}:{}),...(options.signal?{signal:options.signal}:{})});
  let data={};try{data=await response.json()}catch{}
- if(!response.ok){if(response.status===401&&path!=='/login')showLogin();throw new Error(data.error||'Request failed')}
+ if(!response.ok){if(response.status===401&&path!=='/login'&&generation===authGeneration)showLogin();throw new Error(data.error||'Request failed')}
  return data;
 }
-function showLogin(){$('app').hidden=true;$('login-screen').hidden=false;state=null;csrf='';notice('')}
+function showLogin(){authGeneration++;probeController?.abort();probeController=null;checking=false;$('app').hidden=true;$('login-screen').hidden=false;state=null;csrf='';notice('')}
 function notice(message,error=false){$('notice').textContent=message;$('notice').classList.toggle('error',error);$('notice').hidden=!message}
 async function load(){
- try{state=await api('/state');csrf=state.csrf;$('login-screen').hidden=true;$('app').hidden=false;render();return true}
- catch(error){if(state)notice(error.message,true);return false}
+ const generation=authGeneration;
+ try{const next=await api('/state');if(generation!==authGeneration)return false;state=next;csrf=state.csrf;$('login-screen').hidden=true;$('app').hidden=false;render();return true}
+ catch(error){if(generation===authGeneration&&state)notice(error.message,true);return false}
 }
 function element(tag,text,className=''){const e=document.createElement(tag);e.textContent=text;if(className)e.className=className;return e}
 function updatedAt(sub){return sub.updatedAt&&!sub.updatedAt.startsWith('0001-')?`Updated ${new Date(sub.updatedAt).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}`:'Not updated yet'}
@@ -39,8 +40,8 @@ function render(){
  const subscriptions=state.subscriptions,multiple=subscriptions.length>1;
  $('subscription-meta').textContent=multiple?`${subscriptions.length} subscriptions`:subscriptions.length?`${subscriptions[0].name} · ${updatedAt(subscriptions[0])}`:'';
  $('refresh-source').hidden=multiple;$('refresh-source').disabled=busy||!subscriptions.length;
- $('probe-servers').disabled=busy||state.probing||!subscriptions.some(s=>s.nodes.length);
- $('probe-servers').textContent=state.probing?'Checking…':multiple?'Check all servers':'Check servers';
+ $('probe-servers').disabled=busy||checking||state.probing||!subscriptions.some(s=>s.nodes.length);
+ $('probe-servers').textContent=(checking||state.probing)?'Checking…':multiple?'Check all servers':'Check servers';
  const hasNodes=subscriptions.some(s=>s.nodes.length);
  $('server-search').hidden=!hasNodes;$('switch-hint').hidden=!hasNodes;
  const rows=$('server-list');rows.replaceChildren();const query=$('server-search').value.trim().toLocaleLowerCase('en');
@@ -73,7 +74,7 @@ function render(){
  if(state.lastError&&!$('notice').textContent)notice(state.lastError,true);
 }
 $('login-form').addEventListener('submit',async event=>{event.preventDefault();$('login-button').disabled=true;$('login-error').hidden=true;
- try{const result=await api('/login',{method:'POST',body:{password:$('password').value}});csrf=result.csrf;$('password').value='';await load()}
+ try{const result=await api('/login',{method:'POST',body:{password:$('password').value}});authGeneration++;csrf=result.csrf;$('password').value='';await load()}
  catch(error){$('login-error').textContent=error.message;$('login-error').hidden=false}
  finally{$('login-button').disabled=false}
 });
@@ -81,6 +82,15 @@ $('logout').addEventListener('click',async()=>{try{await api('/logout',{method:'
 $('core-toggle').addEventListener('click',()=>{const running=state?.running;action(()=>api(`/xray/${running?'stop':'start'}`,{method:'POST',body:{}}),running?'Xray stopped':'Xray started',running?'Stopping Xray…':'Starting Xray…')});
 $('core-restart').addEventListener('click',()=>action(()=>api('/xray/restart',{method:'POST',body:{}}),'Xray restarted','Restarting Xray…'));
 $('refresh-source').addEventListener('click',()=>{const sub=state?.subscriptions[0];if(sub)refresh(sub)});
-$('probe-servers').addEventListener('click',()=>action(()=>api('/probe',{method:'POST',body:{}}),'Server check complete','Checking servers through VPN…'));
+async function checkServers(){
+ if(busy||checking||state?.probing)return;
+ const controller=new AbortController();probeController=controller;checking=true;render();notice('Checking servers through VPN…');
+ try{
+  await api('/probe',{method:'POST',body:{},signal:controller.signal});
+  if(probeController===controller&&state){await load();if(probeController===controller&&state)notice('Server check complete')}
+ }catch(error){if(error.name!=='AbortError'&&probeController===controller&&state)notice(error.message,true)}
+ finally{if(probeController===controller){probeController=null;checking=false;if(state)render()}}
+}
+$('probe-servers').addEventListener('click',checkServers);
 $('server-search').addEventListener('input',render);
 load();setInterval(()=>{if(!$('app').hidden&&!document.hidden)load()},5000);

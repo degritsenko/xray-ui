@@ -41,7 +41,7 @@ RUN apk add --no-cache python3 openssl jq curl
 
 FROM base AS runtime
 LABEL org.opencontainers.image.title="xray-panel" \
-      org.opencontainers.image.description="Lightweight VLESS REALITY control panel for MikroTik."
+      org.opencontainers.image.description="Ready-to-run VLESS REALITY solution for MikroTik with Xray, TUN and a web panel."
 RUN mkdir -p /opt/xray/state && chmod 700 /opt/xray/state
 COPY --from=extract /out/xray /opt/xray/xray
 COPY --from=extract /out/LICENSE /usr/share/licenses/xray/LICENSE

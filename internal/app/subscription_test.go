@@ -102,3 +102,20 @@ func TestStableIDsMatchLegacyImporter(t *testing.T) {
 		}
 	}
 }
+
+func TestSubscriptionDeduplicatesEquivalentConnections(t *testing.T) {
+	alias := strings.Split(sampleURI, "#")[0] + "#Alias"
+	nodes, skipped, err := ParseSubscription([]byte(sampleURI + "\n" + alias + "\n" + strings.Replace(sampleURI, ":443?", ":8443?", 1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(nodes) != 2 || skipped != 0 {
+		t.Fatalf("expected two unique connections, got %d (skipped %d)", len(nodes), skipped)
+	}
+	if nodes[0].Name != "Germany 🇩🇪" {
+		t.Fatal("first alias was not retained")
+	}
+	if _, err = SelectNode(nodes, "", nodes[0].ID); err != nil {
+		t.Fatal("deduplicated connection cannot be selected", err)
+	}
+}

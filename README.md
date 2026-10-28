@@ -1,4 +1,4 @@
-# xray-panel
+# xray-ui
 
 Ready-to-run VLESS REALITY solution for MikroTik, powered by Xray with native TUN and a web panel.
 
@@ -13,22 +13,22 @@ Requires RouterOS 7 with the container package enabled, a working container netw
 Add the environment variables:
 
 ```routeros
-/container/envs/add list=xray-panel key=SUBSCRIPTION_URL value="https://provider.example/sub/YOUR_TOKEN"
-/container/envs/add list=xray-panel key=PANEL_PASSWORD value="REPLACE_WITH_A_LONG_RANDOM_PASSWORD"
+/container/envs/add list=xray-ui key=SUBSCRIPTION_URL value="https://provider.example/sub/YOUR_TOKEN"
+/container/envs/add list=xray-ui key=PANEL_PASSWORD value="REPLACE_WITH_A_LONG_RANDOM_PASSWORD"
 ```
 
 Optional second subscription:
 
 ```routeros
-/container/envs/add list=xray-panel key=SUBSCRIPTION_URL_2 value="https://another-provider.example/sub/YOUR_TOKEN"
+/container/envs/add list=xray-ui key=SUBSCRIPTION_URL_2 value="https://another-provider.example/sub/YOUR_TOKEN"
 ```
 
 Create the container:
 
 ```routeros
 /container/config/set registry-url=https://registry-1.docker.io
-/container/add name=xray-panel remote-image=gritsenko/xray-panel:latest interface=xray-veth envlists=xray-panel dns=172.18.20.5 root-dir=/docker/xray-panel logging=yes start-on-boot=yes
-/container/start [find where name="xray-panel"]
+/container/add name=xray-ui remote-image=gritsenko/xray-ui:latest interface=xray-veth envlists=xray-ui dns=172.18.20.5 root-dir=/docker/xray-ui logging=yes start-on-boot=yes
+/container/start [find where name="xray-ui"]
 ```
 
 Open **http://172.18.20.6:8080** and sign in with `PANEL_PASSWORD`. Use a password of at least 12 characters. Keep the panel accessible only from your trusted network.
@@ -63,7 +63,7 @@ Build one platform locally (replace `linux/arm64` as needed):
 ```sh
 docker buildx build --platform linux/arm64 --target final \
   --provenance=false --sbom=false \
-  -t your_username/xray-panel:test --load .
+  -t your_username/xray-ui:test --load .
 ```
 
 Publish all three platforms under one tag. Replace the image name with your Docker Hub repository, then use that same name in `remote-image` on MikroTik:
@@ -72,7 +72,7 @@ Publish all three platforms under one tag. Replace the image name with your Dock
 docker login
 docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 \
   --target final --provenance=false --sbom=false \
-  -t your_username/xray-panel:test --push .
+  -t your_username/xray-ui:test --push .
 ```
 
 ARMv5 devices such as hEX Refresh are not supported by this Alpine image.
@@ -88,8 +88,8 @@ node --test tests/panel-ui.test.cjs
 Optional network integration test inside a disposable privileged container:
 
 ```sh
-docker buildx build --platform linux/arm64 --target test -t xray-panel-test --load .
-docker run --rm --privileged --platform linux/arm64 xray-panel-test
+docker buildx build --platform linux/arm64 --target test -t xray-ui-test --load .
+docker run --rm --privileged --platform linux/arm64 xray-ui-test
 ```
 
 The final runtime image contains no Go compiler, Python, curl, jq or web-server dependency. See [third-party notices](THIRD_PARTY.md).

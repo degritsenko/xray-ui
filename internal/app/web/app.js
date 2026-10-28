@@ -70,7 +70,7 @@ function render(){
  if(!visible&&query)rows.append(element('p','No servers found.','empty'));
  if(!subscriptions.length)rows.append(element('p','Set SUBSCRIPTION_URL in the container environment and restart the container.','empty'));
  $('logs').textContent=state.logs.map(entry=>`${new Date(entry.time).toLocaleTimeString('en-GB')}  ${entry.message}`).join('\n')||'No events yet.';
- $('version').textContent=`xray-panel · ${state.version}`;
+ $('version').textContent=`xray-ui · ${state.version}`;
  if(state.lastError&&!$('notice').textContent)notice(state.lastError,true);
 }
 $('login-form').addEventListener('submit',async event=>{event.preventDefault();$('login-button').disabled=true;$('login-error').hidden=true;

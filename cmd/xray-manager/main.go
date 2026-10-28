@@ -15,7 +15,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gritsenko/xray-panel/internal/app"
+	"github.com/gritsenko/xray-ui/internal/app"
 )
 
 func env(key, fallback string) string {

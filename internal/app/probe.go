@@ -28,6 +28,7 @@ type ProbeSuccess struct {
 	CheckedAt    time.Time `json:"checkedAt"`
 }
 type ProbeResult struct {
+	History      []bool        `json:"history,omitempty"`
 	Error        string        `json:"error,omitempty"`
 	LastSuccess  *ProbeSuccess `json:"lastSuccess,omitempty"`
 	Milliseconds int64         `json:"milliseconds"`

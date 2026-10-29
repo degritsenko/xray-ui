@@ -38,6 +38,12 @@ func (m *Manager) checkNode(ctx context.Context, subID string, node Node) bool {
 							result.LastSuccess = &ProbeSuccess{Milliseconds: previous.Milliseconds, CheckedAt: previous.CheckedAt}
 						}
 					}
+					// Allocate a fresh bounded slice so concurrent snapshots stay immutable.
+					history := m.probes[key].History
+					if len(history) > 4 {
+						history = history[len(history)-4:]
+					}
+					result.History = append(append(make([]bool, 0, 5), history...), result.Reachable)
 					m.probes[key] = result
 				}
 			}

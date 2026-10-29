@@ -126,6 +126,15 @@ function render(){
     const result=node.probe,pending=state.probing&&state.probingNode===sub.id+'/'+node.id||checking&&checkScope.nodeID===node.id&&checkScope.subscriptionID===sub.id;
     const delay=element('button','',`server-delay${result&&!result.reachable?' unavailable':!result?' unknown':result.milliseconds>150?' slow':''}${stale(result,chosen&&connected)?' stale':''}`);delay.type='button';delay.setAttribute('data-focus','probe:'+nodeKey(sub,node));delay.disabled=busy||probing;delay.title='Check HTTPS latency through this VPN server';delay.setAttribute('aria-label',`Check ${node.name}`);
     const detail=pending?'Checking…':result?age(result.checkedAt):'Click to check';
+    const history=Array.isArray(result?.history)?result.history.slice(-5):[];
+    const strip=element('div','','probe-history');strip.setAttribute('role','img');
+    const labels=[];
+    for(let i=0;i<5;i++){
+     const value=history[i-(5-history.length)],label=value===true?'Passed':value===false?'Failed':'No data';
+     labels.push(label);const segment=element('span','',`history-segment${value===true?' passed':value===false?' failed':''}`);segment.setAttribute('aria-hidden','true');strip.append(segment);
+    }
+    strip.title='Last 5 checks, oldest first: '+labels.join(', ');strip.setAttribute('aria-label',strip.title);info.append(strip);
+
     if(result&&!result.reachable&&result.error&&result.error!=='Check failed')info.append(element('div',result.error,'server-probe-error'));
     delay.append(element('span',latencyText(result),'delay-value'),element('span',detail,'checked-age'));
     if(result&&!result.reachable&&result.lastSuccess)delay.append(element('span',`Last: ${result.lastSuccess.milliseconds} ms · ${age(result.lastSuccess.checkedAt)}`,'last-success'));

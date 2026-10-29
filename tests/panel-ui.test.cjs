@@ -149,3 +149,13 @@ test('failed check retains last successful delay and exposes its age and failure
  const firstFailure=fixture({failedProbe:{reachable:false,milliseconds:0,error:'Server DNS lookup failed',checkedAt:new Date().toISOString()}});await flush();
  assert.equal(firstFailure.ids.get('active-latency').textContent,'—','invented a successful result');
 });
+test('availability strip shows exactly five checks with newest on the right',async()=>{
+ const f=fixture({failedProbe:{reachable:false,checkedAt:new Date().toISOString(),history:[true,false,true]}});await flush();
+ const walk=e=>[e,...e.children.flatMap(walk)];
+ const strips=walk(f.ids.get('server-list')).filter(e=>e.className==='probe-history');
+ assert.ok(strips.length>0);
+ assert.deepEqual(strips[0].children.map(e=>e.className),['history-segment','history-segment','history-segment passed','history-segment failed','history-segment passed']);
+ assert.equal(strips[0].attributes['role'],'img');
+ assert.match(strips[0].attributes['aria-label'],/No data, No data, Passed, Failed, Passed/);
+ for(const strip of strips)assert.equal(strip.children.length,5);
+});

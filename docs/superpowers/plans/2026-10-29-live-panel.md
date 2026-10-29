@@ -10,7 +10,7 @@
 - [x] Implement approved interface: active delay, age/staleness, selectable auto interval, favorites, sort, collapsible groups, individual checks.
 - [x] Extend meaningful client tests for filtering/sorting/check state; preserve native login and logout race coverage.
 - [x] Run Go race/vet, client tests, real browser visual checks and container integration; request one independent review.
-- [ ] Update README/screenshot, commit and publish checked changes and all four image platforms.
+- [x] Update README/screenshot, commit and publish checked changes and all four image platforms.
 
 Constraints: English UI, dark only, no subscription editing, no automatic switching, sequential probes for limited router memory. Intervals Off/5/10/30 min; default 10 min. Active checks roughly 60 seconds when idle. Settings reset at container restart. Browser preferences may remain in local storage.
 Review focus: request cancellation and logout; setting Off mid-check; selected-server changes during probes; refreshed catalogs invalidating IDs; stored browser preference validation.

@@ -82,7 +82,7 @@ docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 \
   -t your_username/xray-ui:test --push .
 ```
 
-ARMv5 devices such as hEX Refresh are not supported by this Alpine image.
+RouterOS devices with an EN7562CT CPU, including hEX Refresh and hAP ax S, support only ARMv5 container images and cannot run this image.
 
 ## Tests
 

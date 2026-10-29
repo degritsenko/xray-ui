@@ -33,6 +33,7 @@ func NewServer(manager *Manager, auth *Auth) http.Handler {
 	s.mux.HandleFunc("GET /api/state", s.protected(s.state))
 	s.mux.HandleFunc("POST /api/subscriptions/{id}/refresh", s.protected(s.refresh))
 	s.mux.HandleFunc("POST /api/probe", s.protected(s.probe))
+	s.mux.HandleFunc("POST /api/probe/settings", s.protected(s.probeSettings))
 	s.mux.HandleFunc("POST /api/activate", s.protected(s.activate))
 	s.mux.HandleFunc("POST /api/xray/{action}", s.protected(s.control))
 	s.mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) { apiError(w, 404, "Request not found") })
@@ -242,12 +243,30 @@ func (s *Server) control(w http.ResponseWriter, r *http.Request, _ webSession) {
 }
 
 func (s *Server) probe(w http.ResponseWriter, r *http.Request, _ webSession) {
-	var empty struct{}
-	if err := decodeBody(w, r, &empty); err != nil {
+	var scope struct {
+		SubscriptionID string `json:"subscriptionID"`
+		NodeID         string `json:"nodeID"`
+	}
+	if err := decodeBody(w, r, &scope); err != nil {
 		apiError(w, 400, err.Error())
 		return
 	}
-	if err := s.manager.ProbeAll(r.Context()); err != nil {
+	if err := s.manager.ProbeScope(r.Context(), scope.SubscriptionID, scope.NodeID); err != nil {
+		apiError(w, 400, err.Error())
+		return
+	}
+	writeJSON(w, 200, map[string]bool{"ok": true})
+}
+
+func (s *Server) probeSettings(w http.ResponseWriter, r *http.Request, _ webSession) {
+	var body struct {
+		IntervalSeconds *int64 `json:"intervalSeconds"`
+	}
+	if err := decodeBody(w, r, &body); err != nil || body.IntervalSeconds == nil {
+		apiError(w, 400, "Choose an automatic check interval")
+		return
+	}
+	if err := s.manager.SetProbeInterval(*body.IntervalSeconds); err != nil {
 		apiError(w, 400, err.Error())
 		return
 	}

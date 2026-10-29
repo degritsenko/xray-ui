@@ -63,6 +63,10 @@ Edit existing entries instead of duplicating them. Configure firewall, NAT, gate
 
 Supports plain-text and Base64 `vless://` subscriptions: **IPv4, TCP/RAW + REALITY**, with optional `xtls-rprx-vision`. Other protocols/transports are skipped. Source names come from `profile-title`, falling back to the subscription hostname.
 
+The panel supports favorites, latency sorting and collapsible subscriptions. Favorites and list preferences are saved only in your browser.
+
+Automatic HTTPS checks run in the container: the full list every 10 minutes by default, and the active server about every minute. Choose Off, 5, 10 or 30 minutes in the panel, or check a subscription or a single server manually. Checks run sequentially without switching the active server. Results show their age; stale results are dimmed. The automatic check interval resets at container startup.
+
 Startup loads subscriptions from environment variables and connects to the first working server. Later slow sources do not delay an available connection. Failed updates retain the previous configuration. Switching servers can interrupt connections. Latency is an HTTPS request through the VPN, not a bandwidth test.
 
 ## Build your own image

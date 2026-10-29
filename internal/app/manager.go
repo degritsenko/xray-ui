@@ -9,21 +9,26 @@ import (
 )
 
 type Manager struct {
-	op          sync.Mutex
-	mu          sync.RWMutex
-	state       State
-	store       StateStore
-	network     Runtime
-	core        Core
-	logs        *LogBuffer
-	lastError   string
-	userAgent   string
-	prober      Prober
-	probeMu     sync.Mutex
-	probes      map[string]ProbeResult
-	probing     bool
-	intent      uint64
-	coreVersion string
+	op                   sync.Mutex
+	mu                   sync.RWMutex
+	state                State
+	store                StateStore
+	network              Runtime
+	core                 Core
+	logs                 *LogBuffer
+	lastError            string
+	userAgent            string
+	prober               Prober
+	probeMu              sync.Mutex
+	probes               map[string]ProbeResult
+	probing              bool
+	intent               uint64
+	coreVersion          string
+	probeIntervalSeconds int64
+	nextProbeAt          time.Time
+	nextActiveProbeAt    time.Time
+	probingNode          string
+	autoProbeCancel      context.CancelFunc
 }
 
 func NewManager(store StateStore, state State, network Runtime, core Core, logs *LogBuffer) *Manager {
@@ -31,6 +36,7 @@ func NewManager(store StateStore, state State, network Runtime, core Core, logs 
 		logs = NewLogBuffer(nil)
 	}
 	m := &Manager{store: store, state: cloneState(state), network: network, core: core, logs: logs, userAgent: "xray-mikrotik"}
+	_ = m.SetProbeInterval(600)
 	m.updateSecrets(state)
 	return m
 }
@@ -364,6 +370,7 @@ type NodeView struct {
 	Probe  *ProbeResult `json:"probe,omitempty"`
 }
 type SubscriptionView struct {
+	PreferenceID    string     `json:"preferenceID"`
 	ID              string     `json:"id"`
 	Name            string     `json:"name"`
 	Host            string     `json:"host"`
@@ -380,15 +387,18 @@ type ActiveView struct {
 	SourceChanged  bool     `json:"sourceChanged"`
 }
 type Snapshot struct {
-	CoreVersion   string             `json:"coreVersion"`
-	Subscriptions []SubscriptionView `json:"subscriptions"`
-	Active        *ActiveView        `json:"active"`
-	Running       bool               `json:"running"`
-	LastError     string             `json:"lastError"`
-	Logs          []LogEntry         `json:"logs"`
-	CSRF          string             `json:"csrf,omitempty"`
-	Version       string             `json:"version"`
-	Probing       bool               `json:"probing"`
+	CoreVersion          string             `json:"coreVersion"`
+	Subscriptions        []SubscriptionView `json:"subscriptions"`
+	Active               *ActiveView        `json:"active"`
+	Running              bool               `json:"running"`
+	LastError            string             `json:"lastError"`
+	Logs                 []LogEntry         `json:"logs"`
+	CSRF                 string             `json:"csrf,omitempty"`
+	Version              string             `json:"version"`
+	Probing              bool               `json:"probing"`
+	ProbingNode          string             `json:"probingNode"`
+	ProbeIntervalSeconds int64              `json:"probeIntervalSeconds"`
+	NextProbeAt          time.Time          `json:"nextProbeAt"`
 }
 
 func viewNode(n Node) NodeView {
@@ -396,11 +406,14 @@ func viewNode(n Node) NodeView {
 }
 func (m *Manager) Snapshot() Snapshot {
 	s := m.stateCopy()
-	view := Snapshot{Subscriptions: []SubscriptionView{}, Running: m.core.Running(), Logs: m.logs.Entries(), Version: "ui-6"}
+	view := Snapshot{Subscriptions: []SubscriptionView{}, Running: m.core.Running(), Logs: m.logs.Entries(), Version: "ui-7"}
 	m.mu.RLock()
 	view.LastError = m.lastError
 	view.CoreVersion = m.coreVersion
 	view.Probing = m.probing
+	view.ProbingNode = m.probingNode
+	view.ProbeIntervalSeconds = m.probeIntervalSeconds
+	view.NextProbeAt = m.nextProbeAt
 	results := make(map[string]ProbeResult, len(m.probes))
 	for k, v := range m.probes {
 		results[k] = v
@@ -419,7 +432,7 @@ func (m *Manager) Snapshot() Snapshot {
 		if name == "" {
 			name = sub.Name
 		}
-		sv := SubscriptionView{ID: sub.ID, Name: name, Host: host, IntervalSeconds: sub.IntervalSeconds, Nodes: []NodeView{}, UpdatedAt: sub.UpdatedAt, Error: sub.Error, Skipped: sub.Skipped}
+		sv := SubscriptionView{PreferenceID: sourceHash("panel-preferences/" + sub.URL), ID: sub.ID, Name: name, Host: host, IntervalSeconds: sub.IntervalSeconds, Nodes: []NodeView{}, UpdatedAt: sub.UpdatedAt, Error: sub.Error, Skipped: sub.Skipped}
 		for _, n := range sub.Nodes {
 			nv := viewNode(n)
 			if result, ok := results[sub.ID+"/"+n.ID]; ok {
@@ -431,6 +444,9 @@ func (m *Manager) Snapshot() Snapshot {
 	}
 	if s.Active != nil {
 		view.Active = &ActiveView{SubscriptionID: s.Active.SubscriptionID, Node: viewNode(s.Active.Node), Enabled: s.Active.Enabled}
+		if result, ok := results[s.Active.SubscriptionID+"/"+s.Active.Node.ID]; ok {
+			view.Active.Node.Probe = &result
+		}
 		if index, err := findSub(s, s.Active.SubscriptionID); err == nil {
 			view.Active.SourceChanged = sourceHash(s.Subscriptions[index].URL) != s.Active.SourceHash
 		}

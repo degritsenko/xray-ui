@@ -20,18 +20,19 @@
  <main class="workspace">
   <section class="connection-card" aria-label="Current connection">
    <div class="connection-info"><span id="connection-status" class="status">Not connected</span><h1 id="active-name">Select a server</h1><p id="active-detail" class="muted">No server selected.</p><p id="source-warning" class="inline-warning" hidden>The subscription URL changed. The previous connection is still in use.</p></div>
-   <div class="connection-actions"><button id="core-toggle" class="primary" disabled>Start</button><button id="core-restart" class="secondary" disabled>Restart</button></div>
+   <div id="active-delay" class="active-delay"><div><strong id="active-latency">—</strong><span>ms</span></div><p id="active-checked" class="hint">Not checked</p></div>
+   <div class="connection-actions"><button id="core-toggle" class="primary" disabled>Start</button><button id="core-restart" class="secondary restart" aria-label="Restart Xray" title="Restart Xray" disabled>↻</button></div>
   </section>
   <div id="notice" class="notice" role="status" hidden></div>
   <div id="busy-bar" class="busy-bar" role="status" hidden><span class="spinner" aria-hidden="true"></span><span id="busy-text">Applying settings…</span></div>
   <section class="servers" aria-label="Servers">
-   <div class="servers-heading"><div><h2>Servers</h2><p id="subscription-meta" class="hint"></p></div><div class="source-actions"><button id="refresh-source" class="secondary" disabled>Refresh subscription</button><button id="probe-servers" class="secondary" disabled>Check servers</button></div></div>
-   <input id="server-search" type="search" placeholder="Search servers…" aria-label="Search servers" hidden>
+   <div class="servers-heading"><div class="servers-heading-copy"><h2>Servers</h2><span id="subscription-meta" class="hint"></span></div><label class="auto-check">Auto-check <select id="auto-check-interval" aria-label="Automatic server check interval"><option value="0">Off</option><option value="300">5 min</option><option value="600" selected>10 min</option><option value="1800">30 min</option></select></label></div>
+   <div class="server-tools"><input id="server-search" type="search" placeholder="Search servers…" aria-label="Search servers" hidden><div class="server-filters"><button id="filter-all" aria-pressed="true">All</button><button id="filter-favorites" aria-pressed="false">Favorites</button></div><select id="server-sort" aria-label="Sort servers"><option value="subscription">Subscription order</option><option value="latency">Lowest latency</option></select><button id="probe-servers" class="secondary" disabled>Check all</button></div>
    <div id="server-list" class="server-list"></div>
    <p id="switch-hint" class="hint switch-hint" hidden>Switching servers may interrupt active connections.</p>
   </section>
   <details class="logs"><summary>Event log</summary><pre id="logs" tabindex="0" aria-label="Event log"></pre></details>
-  <footer><span>Subscription URLs are configured through container environment variables.</span><span id="version"></span></footer>
+  <footer><span id="next-check">Automatic checks every 10 min</span><span>Manual server selection</span><span id="version"></span></footer>
  </main>
 </div>
 </body>

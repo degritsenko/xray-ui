@@ -7,6 +7,9 @@ import (
 )
 
 func (m *Manager) checkNode(ctx context.Context, subID string, node Node) bool {
+	m.mu.Lock()
+	m.probingNode = subID + "/" + node.ID
+	m.mu.Unlock()
 	delay, err := m.prober.Probe(ctx, node)
 	if ctx.Err() != nil {
 		return false
@@ -32,35 +35,14 @@ func (m *Manager) checkNode(ctx context.Context, subID string, node Node) bool {
 	m.mu.Unlock()
 	return err == nil
 }
-func (m *Manager) ProbeAll(ctx context.Context) error {
-	if m.prober == nil {
-		return errors.New("server probing is unavailable")
-	}
-	if !m.probeMu.TryLock() {
-		return errors.New("server check is already running")
-	}
-	defer m.probeMu.Unlock()
-	m.mu.Lock()
-	m.probing = true
-	m.mu.Unlock()
-	defer func() { m.mu.Lock(); m.probing = false; m.mu.Unlock() }()
-	for _, sub := range m.stateCopy().Subscriptions {
-		for _, node := range sub.Nodes {
-			if ctx.Err() != nil {
-				return ctx.Err()
-			}
-			m.checkNode(ctx, sub.ID, node)
-		}
-	}
-	return ctx.Err()
-}
+func (m *Manager) ProbeAll(ctx context.Context) error { return m.ProbeScope(ctx, "", "") }
 func (m *Manager) bootstrapProbed(ctx context.Context) error {
 	m.probeMu.Lock()
 	defer m.probeMu.Unlock()
 	m.mu.Lock()
 	m.probing = true
 	m.mu.Unlock()
-	defer func() { m.mu.Lock(); m.probing = false; m.mu.Unlock() }()
+	defer func() { m.mu.Lock(); m.probing = false; m.probingNode = ""; m.mu.Unlock() }()
 	m.op.Lock()
 	initial := m.stateCopy()
 	intent := m.intent

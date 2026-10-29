@@ -226,3 +226,31 @@ func TestSignInPagePreservesSameOriginFormOrigin(t *testing.T) {
 		t.Fatal("opaque origins must remain rejected")
 	}
 }
+
+func TestProbeSettingsRequireAuthenticationCSRFAndAllowedInterval(t *testing.T) {
+	s, m := setupHTTP(t)
+	r := request(t, s.Client(), "POST", s.URL+"/api/probe/settings", `{"intervalSeconds":0}`, nil, "", s.URL)
+	r.Body.Close()
+	if r.StatusCode != 401 {
+		t.Fatal("anonymous settings accepted")
+	}
+	cookie, csrf := login(t, s)
+	r = request(t, s.Client(), "POST", s.URL+"/api/probe/settings", `{"intervalSeconds":0}`, cookie, "", s.URL)
+	r.Body.Close()
+	if r.StatusCode != 403 {
+		t.Fatal("settings accepted without CSRF")
+	}
+	for _, tc := range []struct {
+		body   string
+		status int
+	}{{`{"intervalSeconds":0}`, 200}, {`{"intervalSeconds":300}`, 200}, {`{"intervalSeconds":1800}`, 200}, {`{"intervalSeconds":600}`, 200}, {`{"intervalSeconds":1}`, 400}, {`{}`, 400}, {`{"intervalSeconds":null}`, 400}, {`{"intervalSeconds":600,"url":"https://evil.example"}`, 400}} {
+		r = request(t, s.Client(), "POST", s.URL+"/api/probe/settings", tc.body, cookie, csrf, s.URL)
+		r.Body.Close()
+		if r.StatusCode != tc.status {
+			t.Fatalf("%s: %d", tc.body, r.StatusCode)
+		}
+	}
+	if m.Snapshot().ProbeIntervalSeconds != 600 {
+		t.Fatal("invalid settings changed schedule")
+	}
+}

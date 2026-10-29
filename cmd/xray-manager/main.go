@@ -96,6 +96,7 @@ func run() error {
 	serveErrors := make(chan error, 1)
 	go func() { serveErrors <- server.Serve(listener) }()
 	var workers sync.WaitGroup
+	workers.Go(func() { manager.RunProbeScheduler(ctx) })
 	workers.Go(func() { _ = manager.Bootstrap(ctx); manager.RunScheduler(ctx) })
 	hup := make(chan os.Signal, 1)
 	signal.Notify(hup, syscall.SIGHUP)

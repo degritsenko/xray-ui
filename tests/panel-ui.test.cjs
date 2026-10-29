@@ -14,9 +14,10 @@ class Element {
  fire(type='click'){assert.equal(this.disabled,false,'control must remain enabled');return this.listeners[type]?.({preventDefault(){}});}
 }
 const flush=async()=>{for(let i=0;i<8;i++)await new Promise(setImmediate)};
-function fixture(){
- const nodes=[{id:'one',name:'First',server:'first.example.com',port:443},{id:'two',name:'Second',server:'second.example.com',port:443}];
- const state={subscriptions:[{id:'sub',name:'VPN',nodes,updatedAt:'2026-10-28T00:00:00Z',error:''}],active:{subscriptionID:'sub',node:nodes[0],enabled:true},running:true,probing:false,logs:[],csrf:'test-csrf',version:'test',coreVersion:'26.9.9'};
+function fixture(options={}){
+ const nodes=[{id:'one',name:'First',server:'first.example.com',port:443,probe:{reachable:true,milliseconds:200,checkedAt:new Date().toISOString()}},{id:'two',name:'Second',server:'second.example.com',port:443,probe:{reachable:true,milliseconds:30,checkedAt:new Date().toISOString()}}];
+ const state={subscriptions:[{id:'sub',name:'VPN',nodes,updatedAt:'2026-10-28T00:00:00Z',error:''}],active:{subscriptionID:'sub',node:nodes[0],enabled:true},running:true,probing:false,logs:[],csrf:'test-csrf',version:'test',coreVersion:'26.9.9',probeIntervalSeconds:600,nextProbeAt:'2026-10-29T12:00:00Z'};
+ if(options.sameHost){state.subscriptions[0].host='provider.example';state.subscriptions[0].preferenceID='feed-a';state.subscriptions.push({...structuredClone(state.subscriptions[0]),id:'sub-two',preferenceID:'feed-b'})}
  const all=[],ids=new Map();
  const document={hidden:false,getElementById(id){if(!ids.has(id)){const e=new Element(/toggle|restart|logout|refresh-source|probe-servers|login-button/.test(id)?'button':'div');e.id=id;ids.set(id,e);all.push(e)}return ids.get(id)},createElement(tag){const e=new Element(tag);all.push(e);return e},querySelectorAll(){return all.filter(e=>e.tagName==='button'&&e.id!=='login-button')}};
  const calls=[];let finishProbe,deferState=false,releaseState;
@@ -33,7 +34,7 @@ function fixture(){
   return response(url==='/api/state'?structuredClone(state):{});
  };
  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../internal/app/web/app.js'),'utf8'),{document,fetch,setInterval(){},AbortController});
- return {document,all,ids,calls,finish:()=>finishProbe(),deferState:()=>deferState=true,releaseState:()=>releaseState()};
+ return {document,all,ids,calls,state,finish:()=>finishProbe(),deferState:()=>deferState=true,releaseState:()=>releaseState()};
 }
 test('server checks leave Connect and Stop usable while the probe request is pending',async()=>{
  const f=fixture();await flush();
@@ -81,4 +82,31 @@ test('sign-in uses a native named form with password-manager autocomplete hints'
  assert.match(html,/<input\b[^>]*name="username"[^>]*autocomplete="username"/);
  const script=fs.readFileSync(path.join(__dirname,'../internal/app/web/app.js'),'utf8');
  assert.doesNotMatch(script,/\$\('login-form'\)\.addEventListener\('submit'/,'native submit must reach the browser');
+});
+
+test('latency sort and favorites filter preserve manual connection selection',async()=>{
+ const f=fixture();await flush();
+ const root=f.ids.get('server-list');const walk=e=>[e,...e.children.flatMap(walk)];
+ f.state.subscriptions[0].nodes[0].probe={reachable:true,milliseconds:200,checkedAt:new Date().toISOString()};
+ f.state.subscriptions[0].nodes[1].probe={reachable:true,milliseconds:30,checkedAt:new Date().toISOString()};
+ const sort=f.document.getElementById('server-sort');sort.value='latency';await sort.fire('change');
+ let names=walk(root).filter(e=>e.className==='server-name').map(e=>e.textContent);
+ assert.deepEqual(names,['Second','First']);
+ const star=walk(root).find(e=>e.tagName==='button'&&e.attributes['aria-label']==='Add Second to favorites');
+ assert.ok(star,'favorite action missing');await star.fire();
+ await f.document.getElementById('filter-favorites').fire();
+ names=walk(root).filter(e=>e.className==='server-name').map(e=>e.textContent);
+ assert.deepEqual(names,['Second']);
+ assert.ok(!f.calls.includes('/api/activate'),'presentation changes switched the VPN');
+});
+
+test('same-host subscriptions keep independent favorites and collapse state',async()=>{
+ const f=fixture({sameHost:true});await flush();
+ const walk=e=>[e,...e.children.flatMap(walk)],root=f.ids.get('server-list');
+ let buttons=walk(root).filter(e=>e.tagName==='button'&&e.attributes['aria-label']==='Add First to favorites');
+ assert.equal(buttons.length,2);await buttons[0].fire();
+ assert.equal(walk(root).filter(e=>e.className==='favorite selected').length,1);
+ await walk(root).find(e=>e.className==='subscription-title').fire();
+ const headings=walk(root).filter(e=>e.className==='subscription-title');
+ assert.equal(headings[0].attributes['aria-expanded'],'false');assert.equal(headings[1].attributes['aria-expanded'],'true');
 });

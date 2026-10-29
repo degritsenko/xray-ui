@@ -59,6 +59,9 @@ if phase in ('first', 'second', 'source-change'):
 
 if phase == 'first':
     call('GET', '/api/state', expected=401, auth=False)
+    call('POST', '/api/probe/settings', {'intervalSeconds': 0})
+    assert call('GET', '/api/state')['probeIntervalSeconds'] == 0
+    call('POST', '/api/probe/settings', {'intervalSeconds': 1}, expected=400)
     state = call('GET', '/api/state')
     assert len(state['subscriptions']) == 1
     assert state['subscriptions'][0]['name'] == 'Cloud VPN', 'provider title was not decoded'
@@ -68,6 +71,7 @@ if phase == 'first':
     state = call('GET', '/api/state')
     assert state['running'], 'startup failed to connect automatically'
     assert state['subscriptions'][0]['nodes'][0]['probe']['reachable']
+    call('POST', '/api/probe', {'subscriptionID': sub, 'nodeID': state['subscriptions'][0]['nodes'][0]['id']})
     call('POST', '/api/probe')
     assert call('GET', '/api/state')['running'], 'probe interrupted active VPN'
     node = state['subscriptions'][0]['nodes'][0]

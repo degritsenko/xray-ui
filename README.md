@@ -10,6 +10,8 @@ AMD64, ARM64 and ARMv7 use Alpine 3.24.3. ARMv5 uses a minimal BusyBox runtime w
 
 The ARMv5 build is intended for RouterOS devices with EN7562CT CPUs, including hEX Refresh and hAP ax S. Startup, panel sign-in and TUN creation have been tested under ARMv5 emulation; VPN operation on these devices has not yet been verified.
 
+ARM64 preview: `gritsenko/xray-ui:arm64-test` adds provider-reported traffic usage, quota and expiry below each subscription. These fields appear only when supplied in `subscription-userinfo` headers or subscription comments, and update on subscription refresh. Subscription refresh errors are shown only in the affected subscription.
+
 ![xray-ui panel](docs/panel.png)
 
 ## Run on MikroTik

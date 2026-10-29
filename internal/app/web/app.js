@@ -5,7 +5,7 @@ async function api(path,options={}){
  const method=options.method||'GET',generation=authGeneration;
  const response=await fetch('/api'+path,{method,credentials:'same-origin',headers:{'Content-Type':'application/json',...(method!=='GET'?{'X-CSRF-Token':csrf}:{})},...(options.body!==undefined?{body:JSON.stringify(options.body)}:{}),...(options.signal?{signal:options.signal}:{})});
  let data={};try{data=await response.json()}catch{}
- if(!response.ok){if(response.status===401&&path!=='/login'&&generation===authGeneration)showLogin();throw new Error(data.error||'Request failed')}
+ if(!response.ok){if(response.status===401&&path!=='/login'&&generation===authGeneration)showLogin();const error=new Error(data.error||'Request failed');error.scope=data.scope;throw error}
  return data;
 }
 function showLogin(){authGeneration++;probeController?.abort();probeController=null;checking=false;$('app').hidden=true;$('login-screen').hidden=false;state=null;csrf='';notice('')}
@@ -23,7 +23,7 @@ function setBusy(value,text='Applying settings…'){
 }
 async function action(work,message,text){
  if(busy)return;setBusy(true,text);notice('');
- try{await work();await load();notice(message)}catch(error){notice(error.message,true);await load()}
+ try{await work();await load();notice(message)}catch(error){if(error.scope==='subscription')notice('');else notice(error.message,true);await load()}
  finally{setBusy(false)}
 }
 function refresh(sub){return action(()=>api(`/subscriptions/${sub.id}/refresh`,{method:'POST',body:{}}),'Subscription updated','Refreshing subscription…')}
@@ -38,6 +38,35 @@ function age(value){const seconds=elapsed(value);if(seconds===null)return 'Not c
 function stale(result,active=false){const seconds=elapsed(result?.checkedAt);return seconds!==null&&seconds>(active?120:(state?.probeIntervalSeconds||600))}
 function latencyText(result){return !result?'Not checked':result.reachable?`${result.milliseconds} ms`:'Check failed'}
 function togglePreference(key,value){const list=preferences[key],index=list.indexOf(value);if(index<0){if(list.length<1024)list.push(value)}else list.splice(index,1);savePreferences();render()}
+function formatBytes(bytes){
+ const units=['B','KB','MB','GB','TB','PB'];let value=bytes,index=0;
+ while(value>=1000&&index<units.length-1){value/=1000;index++}
+ return `${new Intl.NumberFormat('en-GB',{maximumFractionDigits:index?1:0}).format(value)} ${units[index]}`;
+}
+function appendSubscriptionUsage(group,sub){
+ const usage=sub.usage;if(!usage)return;
+ const valid=value=>Number.isSafeInteger(value)&&value>=0;
+ const knownTraffic=valid(usage.upload)||valid(usage.download),knownTotal=valid(usage.total),knownExpiry=valid(usage.expire);
+ if(!knownTraffic&&!knownTotal&&!knownExpiry)return;
+ const used=(valid(usage.upload)?usage.upload:0)+(valid(usage.download)?usage.download:0);
+ const box=element('div','','subscription-usage'),summary=element('div','','usage-summary');
+ let traffic='';
+ if(knownTraffic)traffic=knownTotal&&usage.total>0?`${formatBytes(used)} / ${formatBytes(usage.total)}`:`${formatBytes(used)} used${knownTotal?' · Unlimited':''}`;
+ else if(knownTotal)traffic=usage.total===0?'Unlimited traffic':`Traffic limit ${formatBytes(usage.total)}`;
+ if(traffic){const label=element('span',traffic,'usage-traffic');label.title='Traffic reported by the provider; updated when the subscription is refreshed';summary.append(label)}
+ if(knownExpiry){
+  let text='No expiry',className='usage-expiry';
+  if(usage.expire>0){const expired=usage.expire*1000<=Date.now();text=`${expired?'Expired':'Expires'} ${new Date(usage.expire*1000).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric',timeZone:'UTC'})}`;if(expired)className+=' expired'}
+  const label=element('span',text,className);if(usage.expire>0)label.title=new Date(usage.expire*1000).toISOString();summary.append(label);
+ }
+ box.append(summary);
+ if(knownTraffic&&knownTotal&&usage.total>0){
+  const percent=Math.min(100,Math.max(0,used/usage.total*100));
+  const track=element('div','',`usage-track${used>=usage.total?' exhausted':''}`);track.setAttribute('role','progressbar');track.setAttribute('aria-label',`Traffic quota used for ${sub.name}`);track.setAttribute('aria-valuemin','0');track.setAttribute('aria-valuemax','100');track.setAttribute('aria-valuenow',String(Math.round(percent)));track.setAttribute('aria-valuetext',traffic);
+  const bar=element('div','','usage-fill');bar.style.width=percent+'%';track.append(bar);box.append(track);
+ }
+ group.append(box);
+}
 function render(){
  if(!state)return;
  const active=state.active,connected=state.running,status=$('connection-status');
@@ -81,6 +110,7 @@ function render(){
   const refreshButton=element('button','↻ Refresh subscription','quiet');refreshButton.type='button';refreshButton.disabled=busy;refreshButton.setAttribute('aria-label',`Refresh ${name}`);refreshButton.addEventListener('click',()=>refresh(sub));
   const check=element('button','Check','quiet');check.type='button';check.disabled=busy||probing||!sub.nodes.length;check.setAttribute('aria-label',`Check ${name}`);check.addEventListener('click',()=>checkServers({subscriptionID:sub.id}));
   actions.append(refreshButton,check);heading.append(info,actions);group.append(heading);
+  appendSubscriptionUsage(group,sub);
   if(sub.error){const error=element('p',sub.error,'source-error');error.setAttribute('role','alert');group.append(error)}
   if(!collapsed){
    const list=element('div','','node-list');
@@ -97,8 +127,8 @@ function render(){
     else{const button=element('button','Connect','secondary');button.type='button';button.setAttribute('data-focus','connect:'+nodeKey(sub,node));button.disabled=busy;button.addEventListener('click',()=>action(()=>api('/activate',{method:'POST',body:{subscriptionID:sub.id,nodeID:node.id}}),'Server connected','Connecting…'));row.append(button)}
     list.append(row);
    });
-   if(!nodes.length)list.append(element('p','Refresh the subscription to load servers.','empty'));
-   group.append(list);
+   if(!nodes.length&&!sub.error)list.append(element('p','Refresh the subscription to load servers.','empty'));
+   if(nodes.length||!sub.error)group.append(list);
   }
   rows.append(group);
  });

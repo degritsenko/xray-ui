@@ -39,6 +39,9 @@ func subscriptionTitle(header string, body []byte) string {
 	if title := decodeProfileTitle(header); title != "" {
 		return title
 	}
+	return decodeProfileTitle(subscriptionBodyHeader(body, "profile-title"))
+}
+func subscriptionBodyHeader(body []byte, header string) string {
 	text := strings.TrimSpace(strings.TrimPrefix(string(body), "\ufeff"))
 	if !strings.Contains(text, "://") {
 		encoded := strings.Join(strings.Fields(text), "")
@@ -51,8 +54,8 @@ func subscriptionTitle(header string, body []byte) string {
 	}
 	for _, line := range strings.Split(text, "\n") {
 		key, value, ok := strings.Cut(strings.TrimSpace(line), ":")
-		if ok && strings.EqualFold(strings.TrimSpace(key), "#profile-title") {
-			return decodeProfileTitle(value)
+		if ok && strings.EqualFold(strings.TrimSpace(key), "#"+header) {
+			return strings.TrimSpace(value)
 		}
 	}
 	return ""

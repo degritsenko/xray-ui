@@ -110,7 +110,7 @@ func (m *Manager) bootstrapProbed(ctx context.Context) error {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		if err := m.refresh(ctx, source.ID, connected); err != nil {
+		if err := m.refresh(ctx, source.ID, connected); err != nil && !isSubscriptionRefreshError(err) {
 			m.SetError(err.Error())
 		}
 		if connected {

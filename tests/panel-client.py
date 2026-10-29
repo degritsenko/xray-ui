@@ -64,6 +64,9 @@ if phase == 'first':
     call('POST', '/api/probe/settings', {'intervalSeconds': 1}, expected=400)
     state = call('GET', '/api/state')
     assert len(state['subscriptions']) == 1
+    usage = state['subscriptions'][0]['usage']
+    assert usage['upload'] == 1073741824 and usage['download'] == 2147483648
+    assert usage['total'] == 10737418240 and usage['expire'] == 1798761600
     assert state['subscriptions'][0]['name'] == 'Cloud VPN', 'provider title was not decoded'
     sub = state['subscriptions'][0]['id']
     call('POST', '/api/subscriptions', {'name': 'Forbidden', 'url': 'https://evil.example/sub'}, expected=404)
@@ -94,7 +97,8 @@ elif phase == 'second':
     node = state['subscriptions'][0]['nodes'][0]
     call('GET', f'/api/subscriptions/{sub}', expected=404)
     (root / 'body').write_text('<html>bad response</html>')
-    call('POST', f'/api/subscriptions/{sub}/refresh', expected=400)
+    failure = call('POST', f'/api/subscriptions/{sub}/refresh', expected=400)
+    assert failure['scope'] == 'subscription'
     state = call('GET', '/api/state')
     assert state['running'] and state['active']['node']['id'] == node['id']
     serialized = json.dumps(state)

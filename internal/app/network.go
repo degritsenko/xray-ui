@@ -136,11 +136,15 @@ func (n *LinuxRuntime) Download(ctx context.Context, source, ua string) ([]byte,
 	return data, err
 }
 func (n *LinuxRuntime) DownloadSubscription(ctx context.Context, source, ua string) ([]byte, string, error) {
+	data, metadata, err := n.DownloadSubscriptionMetadata(ctx, source, ua)
+	return data, metadata.Title, err
+}
+func (n *LinuxRuntime) DownloadSubscriptionMetadata(ctx context.Context, source, ua string) ([]byte, SubscriptionMetadata, error) {
 	if err := ValidateURL(source); err != nil {
-		return nil, "", err
+		return nil, SubscriptionMetadata{}, err
 	}
 	if n.iface == "" {
-		return nil, "", errors.New("physical interface is not configured")
+		return nil, SubscriptionMetadata{}, errors.New("physical interface is not configured")
 	}
 	if n.client == nil {
 		dialer := &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second, Control: bindDevice(n.iface)}
@@ -155,25 +159,25 @@ func (n *LinuxRuntime) DownloadSubscription(ctx context.Context, source, ua stri
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, source, nil)
 	if err != nil {
-		return nil, "", errors.New("invalid subscription URL")
+		return nil, SubscriptionMetadata{}, errors.New("invalid subscription URL")
 	}
 	req.Header.Set("User-Agent", ua)
 	response, err := n.client.Do(req)
 	if err != nil {
-		return nil, "", errors.New("could not download subscription: check network and HTTPS URL")
+		return nil, SubscriptionMetadata{}, errors.New("could not download subscription: check network and HTTPS URL")
 	}
 	defer response.Body.Close()
 	if response.StatusCode < 200 || response.StatusCode > 299 {
-		return nil, "", errors.New("subscription server returned an HTTP error")
+		return nil, SubscriptionMetadata{}, errors.New("subscription server returned an HTTP error")
 	}
 	data, err := io.ReadAll(io.LimitReader(response.Body, MaxSubscriptionBytes+1))
 	if err != nil {
-		return nil, "", errors.New("could not read subscription")
+		return nil, SubscriptionMetadata{}, errors.New("could not read subscription")
 	}
 	if len(data) > MaxSubscriptionBytes {
-		return nil, "", errors.New("subscription exceeds 2 MiB")
+		return nil, SubscriptionMetadata{}, errors.New("subscription exceeds 2 MiB")
 	}
-	return data, subscriptionTitle(response.Header.Get("Profile-Title"), data), nil
+	return data, SubscriptionMetadata{Title: subscriptionTitle(response.Header.Get("Profile-Title"), data), Usage: subscriptionUsage(response.Header.Get("Subscription-Userinfo"), data)}, nil
 }
 func (n *LinuxRuntime) Listen(ctx context.Context, address string) (net.Listener, error) {
 	config := net.ListenConfig{Control: bindDevice(n.iface)}

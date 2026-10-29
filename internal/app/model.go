@@ -27,20 +27,21 @@ type Node struct {
 	SpiderX     string `json:"spiderX"`
 }
 type Subscription struct {
-	Title           string    `json:"title,omitempty"`
-	EnvironmentName string    `json:"environmentName,omitempty"`
-	EnvironmentID   string    `json:"environmentID,omitempty"`
-	ID              string    `json:"id"`
-	Name            string    `json:"name"`
-	URL             string    `json:"url"`
-	IntervalSeconds int64     `json:"intervalSeconds"`
-	Nodes           []Node    `json:"nodes"`
-	UpdatedAt       time.Time `json:"updatedAt"`
-	AttemptedAt     time.Time `json:"attemptedAt"`
-	Error           string    `json:"error,omitempty"`
-	Skipped         int       `json:"skipped"`
-	BootstrapName   string    `json:"bootstrapName,omitempty"`
-	BootstrapID     string    `json:"bootstrapID,omitempty"`
+	Usage           *SubscriptionUsage `json:"usage,omitempty"`
+	Title           string             `json:"title,omitempty"`
+	EnvironmentName string             `json:"environmentName,omitempty"`
+	EnvironmentID   string             `json:"environmentID,omitempty"`
+	ID              string             `json:"id"`
+	Name            string             `json:"name"`
+	URL             string             `json:"url"`
+	IntervalSeconds int64              `json:"intervalSeconds"`
+	Nodes           []Node             `json:"nodes"`
+	UpdatedAt       time.Time          `json:"updatedAt"`
+	AttemptedAt     time.Time          `json:"attemptedAt"`
+	Error           string             `json:"error,omitempty"`
+	Skipped         int                `json:"skipped"`
+	BootstrapName   string             `json:"bootstrapName,omitempty"`
+	BootstrapID     string             `json:"bootstrapID,omitempty"`
 }
 type Selection struct {
 	SubscriptionID string          `json:"subscriptionID"`

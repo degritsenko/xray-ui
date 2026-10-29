@@ -6,7 +6,7 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const path=require('node:path');
 class Element {
- constructor(tag='div'){this.tagName=tag;this.hidden=false;this.disabled=false;this.value='';this.textContent='';this.children=[];this.listeners={};this.attributes={};this.classList={toggle(){}};}
+ constructor(tag='div'){this.tagName=tag;this.hidden=false;this.disabled=false;this.value='';this.textContent='';this.children=[];this.listeners={};this.attributes={};this.style={};this.classList={toggle(){}};}
  append(...children){this.children.push(...children);}
  replaceChildren(...children){this.children=children;}
  setAttribute(name,value){this.attributes[name]=value;}
@@ -14,10 +14,11 @@ class Element {
  fire(type='click'){assert.equal(this.disabled,false,'control must remain enabled');return this.listeners[type]?.({preventDefault(){}});}
 }
 const flush=async()=>{for(let i=0;i<8;i++)await new Promise(setImmediate)};
-function fixture(options={}){
+function fixture(fixtureOptions={}){
  const nodes=[{id:'one',name:'First',server:'first.example.com',port:443,probe:{reachable:true,milliseconds:200,checkedAt:new Date().toISOString()}},{id:'two',name:'Second',server:'second.example.com',port:443,probe:{reachable:true,milliseconds:30,checkedAt:new Date().toISOString()}}];
  const state={subscriptions:[{id:'sub',name:'VPN',nodes,updatedAt:'2026-10-28T00:00:00Z',error:''}],active:{subscriptionID:'sub',node:nodes[0],enabled:true},running:true,probing:false,logs:[],csrf:'test-csrf',version:'test',coreVersion:'26.9.9',probeIntervalSeconds:600,nextProbeAt:'2026-10-29T12:00:00Z'};
- if(options.sameHost){state.subscriptions[0].host='provider.example';state.subscriptions[0].preferenceID='feed-a';state.subscriptions.push({...structuredClone(state.subscriptions[0]),id:'sub-two',preferenceID:'feed-b'})}
+ if(fixtureOptions.sameHost){state.subscriptions[0].host='provider.example';state.subscriptions[0].preferenceID='feed-a';state.subscriptions.push({...structuredClone(state.subscriptions[0]),id:'sub-two',preferenceID:'feed-b'})}
+ if(fixtureOptions.usage)state.subscriptions[0].usage=fixtureOptions.usage;
  const all=[],ids=new Map();
  const document={hidden:false,getElementById(id){if(!ids.has(id)){const e=new Element(/toggle|restart|logout|refresh-source|probe-servers|login-button/.test(id)?'button':'div');e.id=id;ids.set(id,e);all.push(e)}return ids.get(id)},createElement(tag){const e=new Element(tag);all.push(e);return e},querySelectorAll(){return all.filter(e=>e.tagName==='button'&&e.id!=='login-button')}};
  const calls=[];let finishProbe,deferState=false,releaseState;
@@ -28,6 +29,7 @@ function fixture(options={}){
    state.probing=true;
    return new Promise((resolve,reject)=>{finishProbe=()=>{state.probing=false;resolve(response())};options.signal?.addEventListener('abort',()=>{state.probing=false;const e=new Error('aborted');e.name='AbortError';reject(e)},{once:true})});
   }
+  if(fixtureOptions.refreshFails&&url.endsWith('/refresh')){state.subscriptions[0].error='could not download subscription';return response({error:'could not download subscription',scope:'subscription'},400)}
   if(url==='/api/xray/stop'){state.running=false;state.active.enabled=false;}
   if(url==='/api/activate'){state.active.node=nodes.find(n=>n.id===JSON.parse(options.body).nodeID);state.running=true;state.active.enabled=true;}
   if(url==='/api/state'&&deferState){deferState=false;const snapshot=structuredClone(state);await new Promise(resolve=>releaseState=resolve);return response(snapshot)}
@@ -109,4 +111,28 @@ test('same-host subscriptions keep independent favorites and collapse state',asy
  await walk(root).find(e=>e.className==='subscription-title').fire();
  const headings=walk(root).filter(e=>e.className==='subscription-title');
  assert.equal(headings[0].attributes['aria-expanded'],'false');assert.equal(headings[1].attributes['aria-expanded'],'true');
+});
+
+test('subscription refresh failure is shown locally without a global notification',async()=>{
+ const f=fixture({refreshFails:true});await flush();
+ const walk=e=>[e,...e.children.flatMap(walk)],root=f.ids.get('server-list');
+ const refresh=walk(root).find(e=>e.tagName==='button'&&e.attributes['aria-label']==='Refresh VPN');
+ await refresh.fire();
+ assert.equal(f.ids.get('notice').hidden,true,'subscription error duplicated at top');
+ assert.ok(walk(root).some(e=>e.className==='source-error'&&e.textContent==='could not download subscription'));
+});
+test('provider usage and expiry render only reported values',async()=>{
+ const walk=e=>[e,...e.children.flatMap(walk)];
+ const f=fixture({usage:{upload:100,download:200,total:1000,expire:1798761600}});await flush();
+ let elements=walk(f.ids.get('server-list'));
+ assert.ok(elements.some(e=>e.textContent==='300 B / 1 KB'),'traffic quota missing');
+ assert.ok(elements.some(e=>e.textContent.startsWith('Expires ')&&e.textContent.includes('2027')),'expiry missing');
+ const progress=elements.find(e=>e.attributes.role==='progressbar');assert.equal(progress.attributes['aria-valuenow'],'30');
+ const unlimited=fixture({usage:{download:0,total:0,expire:0}});await flush();
+ elements=walk(unlimited.ids.get('server-list'));
+ assert.ok(elements.some(e=>e.textContent==='0 B used · Unlimited'));
+ assert.ok(elements.some(e=>e.textContent==='No expiry'));
+ assert.ok(!elements.some(e=>e.attributes.role==='progressbar'));
+ const absent=fixture();await flush();
+ assert.ok(!walk(absent.ids.get('server-list')).some(e=>e.className==='subscription-usage'));
 });

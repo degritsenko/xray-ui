@@ -21,6 +21,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_response(200)
         if self.path != "/sub2":
             self.send_header("Profile-Title", "base64:Q2xvdWQgVlBO")
+        self.send_header('Subscription-Userinfo', 'upload=1073741824; download=2147483648; total=10737418240; expire=1798761600')
         self.send_header('Content-Length', str(len(body)))
         self.end_headers()
         self.wfile.write(body)

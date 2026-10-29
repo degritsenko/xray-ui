@@ -194,7 +194,12 @@ func (m *Manager) refresh(ctx context.Context, id string, apply bool) error {
 	sub.AttemptedAt = time.Now().UTC()
 	var body []byte
 	var title string
-	if downloader, ok := m.network.(SubscriptionDownloader); ok {
+	var usage *SubscriptionUsage
+	if downloader, ok := m.network.(SubscriptionMetadataDownloader); ok {
+		var metadata SubscriptionMetadata
+		body, metadata, err = downloader.DownloadSubscriptionMetadata(ctx, sub.URL, m.userAgent)
+		title, usage = metadata.Title, metadata.Usage
+	} else if downloader, ok := m.network.(SubscriptionDownloader); ok {
 		body, title, err = downloader.DownloadSubscription(ctx, sub.URL, m.userAgent)
 	} else {
 		body, err = m.network.Download(ctx, sub.URL, m.userAgent)
@@ -203,6 +208,9 @@ func (m *Manager) refresh(ctx context.Context, id string, apply bool) error {
 		}
 	}
 	if err == nil {
+		if usage == nil {
+			usage = subscriptionUsage("", body)
+		}
 		sub.Nodes, sub.Skipped, err = ParseSubscription(body)
 	}
 	if err != nil {
@@ -214,8 +222,9 @@ func (m *Manager) refresh(ctx context.Context, id string, apply bool) error {
 			return saveErr
 		}
 		m.logs.Add("Subscription refresh failed; current connection retained")
-		return err
+		return &subscriptionRefreshError{cause: err}
 	}
+	sub.Usage = usage
 	sub.Title = decodeProfileTitle(title)
 	sub.UpdatedAt = time.Now().UTC()
 	sub.Error = ""
@@ -267,7 +276,10 @@ func (m *Manager) refresh(ctx context.Context, id string, apply bool) error {
 		return saveErr
 	}
 	m.logs.Add("Subscription updated")
-	return err
+	if err != nil {
+		return &subscriptionRefreshError{cause: err}
+	}
+	return nil
 }
 func (m *Manager) Control(ctx context.Context, action string) error {
 	m.op.Lock()
@@ -324,7 +336,9 @@ func (m *Manager) Bootstrap(ctx context.Context) error {
 		}
 		if refreshErr := m.Refresh(ctx, sub.ID); refreshErr != nil {
 			err = refreshErr
-			m.SetError(err.Error())
+			if !isSubscriptionRefreshError(err) {
+				m.SetError(err.Error())
+			}
 		}
 	}
 	return err
@@ -370,15 +384,16 @@ type NodeView struct {
 	Probe  *ProbeResult `json:"probe,omitempty"`
 }
 type SubscriptionView struct {
-	PreferenceID    string     `json:"preferenceID"`
-	ID              string     `json:"id"`
-	Name            string     `json:"name"`
-	Host            string     `json:"host"`
-	IntervalSeconds int64      `json:"intervalSeconds"`
-	Nodes           []NodeView `json:"nodes"`
-	UpdatedAt       time.Time  `json:"updatedAt"`
-	Error           string     `json:"error"`
-	Skipped         int        `json:"skipped"`
+	Usage           *SubscriptionUsage `json:"usage,omitempty"`
+	PreferenceID    string             `json:"preferenceID"`
+	ID              string             `json:"id"`
+	Name            string             `json:"name"`
+	Host            string             `json:"host"`
+	IntervalSeconds int64              `json:"intervalSeconds"`
+	Nodes           []NodeView         `json:"nodes"`
+	UpdatedAt       time.Time          `json:"updatedAt"`
+	Error           string             `json:"error"`
+	Skipped         int                `json:"skipped"`
 }
 type ActiveView struct {
 	SubscriptionID string   `json:"subscriptionID"`
@@ -406,7 +421,7 @@ func viewNode(n Node) NodeView {
 }
 func (m *Manager) Snapshot() Snapshot {
 	s := m.stateCopy()
-	view := Snapshot{Subscriptions: []SubscriptionView{}, Running: m.core.Running(), Logs: m.logs.Entries(), Version: "ui-7"}
+	view := Snapshot{Subscriptions: []SubscriptionView{}, Running: m.core.Running(), Logs: m.logs.Entries(), Version: "ui-8"}
 	m.mu.RLock()
 	view.LastError = m.lastError
 	view.CoreVersion = m.coreVersion
@@ -432,7 +447,7 @@ func (m *Manager) Snapshot() Snapshot {
 		if name == "" {
 			name = sub.Name
 		}
-		sv := SubscriptionView{PreferenceID: sourceHash("panel-preferences/" + sub.URL), ID: sub.ID, Name: name, Host: host, IntervalSeconds: sub.IntervalSeconds, Nodes: []NodeView{}, UpdatedAt: sub.UpdatedAt, Error: sub.Error, Skipped: sub.Skipped}
+		sv := SubscriptionView{Usage: sub.Usage, PreferenceID: sourceHash("panel-preferences/" + sub.URL), ID: sub.ID, Name: name, Host: host, IntervalSeconds: sub.IntervalSeconds, Nodes: []NodeView{}, UpdatedAt: sub.UpdatedAt, Error: sub.Error, Skipped: sub.Skipped}
 		for _, n := range sub.Nodes {
 			nv := viewNode(n)
 			if result, ok := results[sub.ID+"/"+n.ID]; ok {

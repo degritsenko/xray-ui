@@ -209,6 +209,10 @@ func (s *Server) refresh(w http.ResponseWriter, r *http.Request, _ webSession) {
 		return
 	}
 	if err := s.manager.Refresh(r.Context(), r.PathValue("id")); err != nil {
+		if isSubscriptionRefreshError(err) {
+			writeJSON(w, 400, map[string]string{"error": err.Error(), "scope": "subscription"})
+			return
+		}
 		apiError(w, 400, err.Error())
 		return
 	}

@@ -12,7 +12,7 @@ The ARMv5 build is intended for RouterOS devices with EN7562CT CPUs, including h
 
 The dark panel includes favorites, latency sorting, automatic HTTPS checks and the last five check results per server. Subscription traffic, quota and expiry are shown when reported by the provider. Failed checks retain the last successful latency; subscription errors stay beside the affected source.
 
-![xray-ui panel](docs/panel.png)
+![xray-ui panel](docs/panel.png?v=ui-13)
 
 ## Run on MikroTik
 

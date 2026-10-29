@@ -99,4 +99,5 @@ docker buildx build --platform linux/arm64 --target test -t xray-ui-test --load 
 docker run --rm --privileged --platform linux/arm64 xray-ui-test
 ```
 
-The final runtime image contains no Go compiler, Python, curl, jq or web-server dependency. See [third-party notices](THIRD_PARTY.md).
+
+[third-party notices](THIRD_PARTY.md).

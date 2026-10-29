@@ -10,7 +10,7 @@ AMD64, ARM64 and ARMv7 use Alpine 3.24.3. ARMv5 uses a minimal BusyBox runtime w
 
 The ARMv5 build is intended for RouterOS devices with EN7562CT CPUs, including hEX Refresh and hAP ax S. Startup, panel sign-in and TUN creation have been tested under ARMv5 emulation; VPN operation on these devices has not yet been verified.
 
-ARM64 preview: `gritsenko/xray-ui:arm64-test` uses a neutral dark server list and adds provider-reported traffic usage, quota and expiry below each subscription. Checks have separate DNS/startup/request timeouts, retry temporary failures once, and retain the last successful latency with its age when a later check fails. These fields appear only when supplied in `subscription-userinfo` headers or subscription comments, and update on subscription refresh. Subscription refresh errors are shown only in the affected subscription.
+The dark panel includes favorites, latency sorting, automatic HTTPS checks and the last five check results per server. Subscription traffic, quota and expiry are shown when reported by the provider. Failed checks retain the last successful latency; subscription errors stay beside the affected source.
 
 ![xray-ui panel](docs/panel.png)
 
@@ -67,7 +67,7 @@ Supports plain-text and Base64 `vless://` subscriptions: **IPv4, TCP/RAW + REALI
 
 The panel supports favorites, latency sorting and collapsible subscriptions. Favorites and list preferences are saved only in your browser.
 
-Automatic HTTPS checks run in the container: the full list every 10 minutes by default, and the active server about every minute. Choose Off, 5, 10 or 30 minutes in the panel, or check a subscription or a single server manually. Checks run sequentially without switching the active server. Results show their age; stale results are dimmed. The automatic check interval resets at container startup.
+Automatic HTTPS checks run in the container: the full list every 10 minutes by default, and the active server about every minute. Choose Off, 5, 10 or 30 minutes in the panel, or check a subscription or a single server manually. Checks run sequentially without switching the active server. Results show their age; stale results are dimmed. Each server keeps its last five completed check results in memory; this history resets on restart. The automatic check interval resets at container startup.
 
 Startup loads subscriptions from environment variables and connects to the first working server. Later slow sources do not delay an available connection. Failed updates retain the previous configuration. Switching servers can interrupt connections. Latency is an HTTPS request through the VPN, not a bandwidth test.
 

@@ -116,15 +116,13 @@ function render(){
   appendSubscriptionUsage(group,sub);
   if(sub.error){const error=element('p',sub.error,'source-error');error.setAttribute('role','alert');group.append(error)}
   if(!collapsed){
-   const list=element('table','','node-list');list.setAttribute('aria-label',name+' servers');
-   const head=element('thead',''),headRow=element('tr','');
-   for(const label of ['Server','Latency','Checked','']){const cell=element('th',label);cell.setAttribute('scope','col');if(label==='Checked')cell.className='checked-column';if(!label)cell.setAttribute('aria-label','Connection');headRow.append(cell)}head.append(headRow);list.append(head);const body=element('tbody','');list.append(body);
+   const list=element('div','','node-list');
    nodes.forEach(node=>{
     const chosen=active?.subscriptionID===sub.id&&active.node.id===node.id&&!active.sourceChanged;
-    const row=element('tr','',`server-row${chosen?' active':''}`),info=element('div','','server-info'),serverCell=element('td','','server-cell'),serverContent=element('div','','server-content');serverCell.append(serverContent);row.append(serverCell);
+    const row=element('div','',`server-row${chosen?' active':''}`),info=element('div','','server-info');
     const favorite=preferences.favorites.includes(nodeKey(sub,node));
-    const star=element('button',favorite?'★':'☆',`favorite${favorite?' selected':''}`);star.type='button';star.setAttribute('data-focus','favorite:'+nodeKey(sub,node));star.disabled=busy;star.setAttribute('aria-label',`${favorite?'Remove':'Add'} ${node.name} ${favorite?'from':'to'} favorites`);star.setAttribute('aria-pressed',String(favorite));star.addEventListener('click',()=>togglePreference('favorites',nodeKey(sub,node)));serverContent.append(star);
-    info.append(element('div',node.name,'server-name'),element('div',`${node.server}:${node.port}`,'server-address'));serverContent.append(info);
+    const star=element('button',favorite?'★':'☆',`favorite${favorite?' selected':''}`);star.type='button';star.setAttribute('data-focus','favorite:'+nodeKey(sub,node));star.disabled=busy;star.setAttribute('aria-label',`${favorite?'Remove':'Add'} ${node.name} ${favorite?'from':'to'} favorites`);star.setAttribute('aria-pressed',String(favorite));star.addEventListener('click',()=>togglePreference('favorites',nodeKey(sub,node)));row.append(star);
+    info.append(element('div',node.name,'server-name'),element('div',`${node.server}:${node.port}`,'server-address'));row.append(info);
     const result=node.probe,pending=state.probing&&state.probingNode===sub.id+'/'+node.id||checking&&checkScope.nodeID===node.id&&checkScope.subscriptionID===sub.id;
     const delay=element('button','',`server-delay${result&&!result.reachable?' unavailable':!result?' unknown':result.milliseconds>150?' slow':''}${stale(result,chosen&&connected)?' stale':''}`);delay.type='button';delay.setAttribute('data-focus','probe:'+nodeKey(sub,node));delay.disabled=busy||probing;delay.title='Check HTTPS latency through this VPN server';delay.setAttribute('aria-label',`Check ${node.name}`);
     const detail=pending?'Checking…':result?age(result.checkedAt):'Click to check';
@@ -132,13 +130,12 @@ function render(){
     delay.append(element('span',latencyText(result),'delay-value'),element('span',detail,'checked-age'));
     if(result&&!result.reachable&&result.lastSuccess)delay.append(element('span',`Last: ${result.lastSuccess.milliseconds} ms · ${age(result.lastSuccess.checkedAt)}`,'last-success'));
     delay.setAttribute('aria-label',`Check ${node.name}. ${latencyText(result)}. ${result?.error||''}. ${detail}`);
-    delay.addEventListener('click',()=>checkServers({subscriptionID:sub.id,nodeID:node.id}));const delayCell=element('td','','latency-cell');delayCell.append(delay);row.append(delayCell);
-    const checkedCell=element('td',detail,'checked-column');row.append(checkedCell);const actionCell=element('td','','action-cell');row.append(actionCell);
-    if(chosen&&connected)actionCell.append(element('span','● Connected','selected-badge'));
-    else{const button=element('button','Connect','secondary');button.type='button';button.setAttribute('data-focus','connect:'+nodeKey(sub,node));button.disabled=busy;button.addEventListener('click',()=>action(()=>api('/activate',{method:'POST',body:{subscriptionID:sub.id,nodeID:node.id}}),'Server connected','Connecting…'));actionCell.append(button)}
-    body.append(row);
+    delay.addEventListener('click',()=>checkServers({subscriptionID:sub.id,nodeID:node.id}));row.append(delay);
+    if(chosen&&connected)row.append(element('span','● Connected','selected-badge'));
+    else{const button=element('button','Connect','secondary');button.type='button';button.setAttribute('data-focus','connect:'+nodeKey(sub,node));button.disabled=busy;button.addEventListener('click',()=>action(()=>api('/activate',{method:'POST',body:{subscriptionID:sub.id,nodeID:node.id}}),'Server connected','Connecting…'));row.append(button)}
+    list.append(row);
    });
-   if(!nodes.length&&!sub.error){const emptyRow=element('tr',''),cell=element('td','Refresh the subscription to load servers.','empty');cell.setAttribute('colspan','4');emptyRow.append(cell);body.append(emptyRow)}
+   if(!nodes.length&&!sub.error)list.append(element('p','Refresh the subscription to load servers.','empty'));
    if(nodes.length||!sub.error)group.append(list);
   }
   rows.append(group);

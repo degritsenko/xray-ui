@@ -126,7 +126,10 @@ func (n *LinuxRuntime) Resolve(ctx context.Context, host string) (string, error)
 		return "", errors.New("physical interface is not configured")
 	}
 	ips, err := net.DefaultResolver.LookupIP(ctx, "ip4", host)
-	if err != nil || len(ips) == 0 {
+	if err != nil {
+		return "", &serverResolveError{cause: err}
+	}
+	if len(ips) == 0 {
 		return "", errors.New("could not resolve server IPv4 address")
 	}
 	return ips[0].String(), nil
@@ -183,3 +186,9 @@ func (n *LinuxRuntime) Listen(ctx context.Context, address string) (net.Listener
 	config := net.ListenConfig{Control: bindDevice(n.iface)}
 	return config.Listen(ctx, "tcp4", address)
 }
+
+// Keep a safe public message while preserving DNS error classification internally.
+type serverResolveError struct{ cause error }
+
+func (e *serverResolveError) Error() string { return "could not resolve server IPv4 address" }
+func (e *serverResolveError) Unwrap() error { return e.cause }

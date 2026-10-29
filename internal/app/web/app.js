@@ -77,9 +77,12 @@ function render(){
  const activeSource=state.subscriptions.find(s=>s.id===active?.subscriptionID);
  $('active-detail').textContent=active?`${active.node.server}:${active.node.port}${activeSource?' · '+activeSource.name:''}`:'No server selected.';
  const activeResult=active?.node.probe||activeSource?.nodes.find(n=>n.id===active?.node.id)?.probe;
- $('active-latency').textContent=activeResult?.reachable?String(activeResult.milliseconds):'—';
- $('active-checked').textContent=activeResult?(activeResult.reachable?'Checked ':'Check failed · ')+age(activeResult.checkedAt):'Not checked';
- $('active-delay').className='active-delay'+(stale(activeResult,true)?' stale':'');
+ const lastGood=activeResult?.reachable?activeResult:activeResult?.lastSuccess;
+ $('active-latency').textContent=lastGood?String(lastGood.milliseconds):'—';
+ $('active-checked').textContent=activeResult?.reachable?'Checked '+age(activeResult.checkedAt):lastGood?'Last success '+age(lastGood.checkedAt):'No successful check';
+ $('active-probe-error').hidden=!activeResult||activeResult.reachable;
+ $('active-probe-error').textContent=activeResult&&!activeResult.reachable?`${activeResult.error||'Check failed'} · ${age(activeResult.checkedAt)}`:'';
+ $('active-delay').className='active-delay'+(stale(lastGood,true)?' stale':'')+(activeResult&&!activeResult.reachable?' last-known':'');
  $('source-warning').hidden=!active?.sourceChanged;
  $('core-toggle').textContent=connected?'Stop':'Start';$('core-toggle').disabled=busy||!active;$('core-restart').disabled=busy||!active||!connected;
  const subscriptions=state.subscriptions,hasNodes=subscriptions.some(s=>s.nodes.length),probing=checking||state.probing;
@@ -122,7 +125,12 @@ function render(){
     info.append(element('div',node.name,'server-name'),element('div',`${node.server}:${node.port}`,'server-address'));row.append(info);
     const result=node.probe,pending=state.probing&&state.probingNode===sub.id+'/'+node.id||checking&&checkScope.nodeID===node.id&&checkScope.subscriptionID===sub.id;
     const delay=element('button','',`server-delay${result&&!result.reachable?' unavailable':!result?' unknown':result.milliseconds>150?' slow':''}${stale(result,chosen&&connected)?' stale':''}`);delay.type='button';delay.setAttribute('data-focus','probe:'+nodeKey(sub,node));delay.disabled=busy||probing;delay.title='Check HTTPS latency through this VPN server';delay.setAttribute('aria-label',`Check ${node.name}`);
-    delay.append(element('span',latencyText(result),'delay-value'),element('span',pending?'Checking…':result?age(result.checkedAt):'Click to check','checked-age'));delay.addEventListener('click',()=>checkServers({subscriptionID:sub.id,nodeID:node.id}));row.append(delay);
+    const detail=pending?'Checking…':result?age(result.checkedAt):'Click to check';
+    if(result&&!result.reachable&&result.error&&result.error!=='Check failed')info.append(element('div',result.error,'server-probe-error'));
+    delay.append(element('span',latencyText(result),'delay-value'),element('span',detail,'checked-age'));
+    if(result&&!result.reachable&&result.lastSuccess)delay.append(element('span',`Last: ${result.lastSuccess.milliseconds} ms · ${age(result.lastSuccess.checkedAt)}`,'last-success'));
+    delay.setAttribute('aria-label',`Check ${node.name}. ${latencyText(result)}. ${result?.error||''}. ${detail}`);
+    delay.addEventListener('click',()=>checkServers({subscriptionID:sub.id,nodeID:node.id}));row.append(delay);
     if(chosen&&connected)row.append(element('span','● Connected','selected-badge'));
     else{const button=element('button','Connect','secondary');button.type='button';button.setAttribute('data-focus','connect:'+nodeKey(sub,node));button.disabled=busy;button.addEventListener('click',()=>action(()=>api('/activate',{method:'POST',body:{subscriptionID:sub.id,nodeID:node.id}}),'Server connected','Connecting…'));row.append(button)}
     list.append(row);

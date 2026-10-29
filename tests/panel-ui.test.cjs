@@ -19,6 +19,7 @@ function fixture(fixtureOptions={}){
  const state={subscriptions:[{id:'sub',name:'VPN',nodes,updatedAt:'2026-10-28T00:00:00Z',error:''}],active:{subscriptionID:'sub',node:nodes[0],enabled:true},running:true,probing:false,logs:[],csrf:'test-csrf',version:'test',coreVersion:'26.9.9',probeIntervalSeconds:600,nextProbeAt:'2026-10-29T12:00:00Z'};
  if(fixtureOptions.sameHost){state.subscriptions[0].host='provider.example';state.subscriptions[0].preferenceID='feed-a';state.subscriptions.push({...structuredClone(state.subscriptions[0]),id:'sub-two',preferenceID:'feed-b'})}
  if(fixtureOptions.usage)state.subscriptions[0].usage=fixtureOptions.usage;
+ if(fixtureOptions.failedProbe)nodes[0].probe=fixtureOptions.failedProbe;
  const all=[],ids=new Map();
  const document={hidden:false,getElementById(id){if(!ids.has(id)){const e=new Element(/toggle|restart|logout|refresh-source|probe-servers|login-button/.test(id)?'button':'div');e.id=id;ids.set(id,e);all.push(e)}return ids.get(id)},createElement(tag){const e=new Element(tag);all.push(e);return e},querySelectorAll(){return all.filter(e=>e.tagName==='button'&&e.id!=='login-button')}};
  const calls=[];let finishProbe,deferState=false,releaseState;
@@ -135,4 +136,16 @@ test('provider usage and expiry render only reported values',async()=>{
  assert.ok(!elements.some(e=>e.attributes.role==='progressbar'));
  const absent=fixture();await flush();
  assert.ok(!walk(absent.ids.get('server-list')).some(e=>e.className==='subscription-usage'));
+});
+
+test('failed check retains last successful delay and exposes its age and failure reason',async()=>{
+ const last={milliseconds:200,checkedAt:new Date(Date.now()-60000).toISOString()};
+ const f=fixture({failedProbe:{reachable:false,milliseconds:0,error:'TLS handshake timed out',checkedAt:new Date().toISOString(),lastSuccess:last}});await flush();
+ assert.equal(f.ids.get('active-latency').textContent,'200');
+ assert.match(f.ids.get('active-checked').textContent,/Last success/);
+ assert.match(f.ids.get('active-probe-error').textContent,/TLS handshake timed out/);
+ const walk=e=>[e,...e.children.flatMap(walk)];
+ assert.ok(walk(f.ids.get('server-list')).some(e=>e.className==='last-success'&&e.textContent.includes('200 ms')));
+ const firstFailure=fixture({failedProbe:{reachable:false,milliseconds:0,error:'Server DNS lookup failed',checkedAt:new Date().toISOString()}});await flush();
+ assert.equal(firstFailure.ids.get('active-latency').textContent,'—','invented a successful result');
 });

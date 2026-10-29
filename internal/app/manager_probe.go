@@ -27,7 +27,18 @@ func (m *Manager) checkNode(ctx context.Context, subID string, node Node) bool {
 		if sub.ID == subID {
 			for _, n := range sub.Nodes {
 				if n.ID == node.ID {
-					m.probes[subID+"/"+node.ID] = result
+					key := subID + "/" + node.ID
+					if err == nil {
+						result.LastSuccess = &ProbeSuccess{Milliseconds: result.Milliseconds, CheckedAt: result.CheckedAt}
+					} else {
+						result.Error = safeProbeError(err)
+						previous := m.probes[key]
+						result.LastSuccess = previous.LastSuccess
+						if result.LastSuccess == nil && previous.Reachable {
+							result.LastSuccess = &ProbeSuccess{Milliseconds: previous.Milliseconds, CheckedAt: previous.CheckedAt}
+						}
+					}
+					m.probes[key] = result
 				}
 			}
 		}

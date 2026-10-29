@@ -4,7 +4,11 @@ Ready-to-run VLESS REALITY solution for MikroTik, powered by Xray with native TU
 
 A complete containerized VPN client: Xray handles traffic through native TUN, while the dark web panel manages subscriptions, server selection and latency checks. Subscription URLs are configured only through container environment variables.
 
-Platforms: **Linux AMD64, ARM64 and ARMv7**. Alpine 3.24.3, Xray 26.9.9.
+Platforms: **Linux AMD64, ARM64, ARMv7 and ARMv5**. Xray 26.9.9.
+
+AMD64, ARM64 and ARMv7 use Alpine 3.24.3. ARMv5 uses a minimal BusyBox runtime with Debian libraries: approximately **21.4 MB compressed / 55 MB unpacked**. The image platform is selected automatically.
+
+The ARMv5 build is intended for RouterOS devices with EN7562CT CPUs, including hEX Refresh and hAP ax S. Startup, panel sign-in and TUN creation have been tested under ARMv5 emulation; VPN operation on these devices has not yet been verified.
 
 ![xray-ui panel](docs/panel.png)
 
@@ -73,16 +77,15 @@ docker buildx build --platform linux/arm64 --target final \
   -t your_username/xray-ui:test --load .
 ```
 
-Publish all three platforms under one tag. Replace the image name with your Docker Hub repository, then use that same name in `remote-image` on MikroTik:
+Publish all four platforms under one tag. Replace the image name with your Docker Hub repository, then use that same name in `remote-image` on MikroTik:
 
 ```sh
 docker login
-docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 \
+docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v5 \
   --target final --provenance=false --sbom=false \
   -t your_username/xray-ui:test --push .
 ```
 
-RouterOS devices with an EN7562CT CPU, including hEX Refresh and hAP ax S, support only ARMv5 container images and cannot run this image.
 
 ## Tests
 
@@ -99,5 +102,4 @@ docker buildx build --platform linux/arm64 --target test -t xray-ui-test --load 
 docker run --rm --privileged --platform linux/arm64 xray-ui-test
 ```
 
-
-[third-party notices](THIRD_PARTY.md).
+See [third-party notices](THIRD_PARTY.md).

@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -125,4 +127,60 @@ func streamSettings(n Node, iface string) map[string]any {
 		stream["xhttpSettings"] = n.XHTTP
 	}
 	return stream
+}
+
+// Providers may duplicate mode and padding inside and outside JSON extra.
+// Normalize them to the native Xray fields before computing the server ID.
+func parseXHTTPSettings(q url.Values) (*XHTTPSettings, error) {
+	x := &XHTTPSettings{Host: q.Get("host"), Path: q.Get("path"), Mode: q.Get("mode")}
+	if x.Path == "" {
+		x.Path = "/"
+	}
+	fields := map[string]json.RawMessage{}
+	if raw, ok := q["extra"]; ok {
+		if len(raw[0]) > 64*1024 || json.Unmarshal([]byte(raw[0]), &fields) != nil || fields == nil {
+			return nil, errors.New("invalid XHTTP extra")
+		}
+	}
+	if raw, ok := fields["mode"]; ok {
+		var mode string
+		if json.Unmarshal(raw, &mode) != nil {
+			return nil, errors.New("invalid XHTTP extra mode")
+		}
+		if x.Mode == "" {
+			x.Mode = mode
+		}
+		delete(fields, "mode")
+	}
+	if x.Mode == "" {
+		x.Mode = "auto"
+	}
+	if padding, ok := q["x_padding_bytes"]; ok {
+		bounds := strings.Split(padding[0], "-")
+		if len(bounds) > 2 {
+			return nil, errors.New("invalid XHTTP padding range")
+		}
+		previous := int64(0)
+		for _, bound := range bounds {
+			value, err := strconv.ParseInt(bound, 10, 32)
+			if err != nil || value <= 0 || value < previous {
+				return nil, errors.New("invalid XHTTP padding range")
+			}
+			previous = value
+		}
+		if _, present := fields["xPaddingBytes"]; !present {
+			fields["xPaddingBytes"], _ = json.Marshal(padding[0])
+		}
+	}
+	if len(fields) > 0 {
+		raw, err := json.Marshal(fields)
+		if err != nil {
+			return nil, err
+		}
+		x.Extra, err = canonicalXHTTPExtra(raw)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return x, nil
 }

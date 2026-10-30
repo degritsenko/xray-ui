@@ -72,6 +72,8 @@ func TestXHTTPRuntime(t *testing.T) {
 				q.Set("path", "/test-xhttp")
 				q.Set("host", "example.com")
 				q.Set("mode", mode)
+				q.Set("x_padding_bytes", "100-1000")
+				q.Set("extra", `{"mode":"auto","xPaddingBytes":"100-1000"}`)
 				q.Set("pbk", base64.RawURLEncoding.EncodeToString(private.PublicKey().Bytes()))
 				q.Set("sid", "abcdef")
 				u.RawQuery = q.Encode()

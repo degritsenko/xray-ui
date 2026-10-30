@@ -12,7 +12,7 @@ import (
 const MaxSubscriptionBytes = 2 * 1024 * 1024
 const MaxNodes = 2048
 
-var allowedParameters = map[string]bool{"security": true, "type": true, "flow": true, "pbk": true, "fp": true, "sni": true, "sid": true, "spx": true, "encryption": true, "headerType": true, "path": true, "host": true, "mode": true, "extra": true, "alpn": true, "support-x25519mlkem768": true}
+var allowedParameters = map[string]bool{"security": true, "type": true, "flow": true, "pbk": true, "fp": true, "sni": true, "sid": true, "spx": true, "encryption": true, "headerType": true, "path": true, "host": true, "mode": true, "extra": true, "alpn": true, "x_padding_bytes": true, "support-x25519mlkem768": true}
 
 func validText(s string) bool {
 	return utf8.ValidString(s) && strings.IndexFunc(s, unicode.IsControl) < 0
@@ -55,7 +55,7 @@ func parseNode(line string) (Node, error) {
 		return Node{}, bad
 	}
 	if network != "xhttp" {
-		for _, key := range []string{"path", "host", "mode", "extra", "alpn"} {
+		for _, key := range []string{"path", "host", "mode", "extra", "alpn", "x_padding_bytes"} {
 			if _, ok := q[key]; ok {
 				return Node{}, bad
 			}
@@ -81,19 +81,9 @@ func parseNode(line string) (Node, error) {
 	if network == "xhttp" {
 		n.Network = "xhttp"
 		n.Security = security
-		n.XHTTP = &XHTTPSettings{Host: q.Get("host"), Path: q.Get("path"), Mode: q.Get("mode")}
-		if n.XHTTP.Path == "" {
-			n.XHTTP.Path = "/"
-		}
-		if n.XHTTP.Mode == "" {
-			n.XHTTP.Mode = "auto"
-		}
-		if extra, ok := q["extra"]; ok {
-			canonical, err := canonicalXHTTPExtra([]byte(extra[0]))
-			if err != nil {
-				return Node{}, bad
-			}
-			n.XHTTP.Extra = canonical
+		n.XHTTP, err = parseXHTTPSettings(q)
+		if err != nil {
+			return Node{}, bad
 		}
 		if alpn, ok := q["alpn"]; ok {
 			n.ALPN = strings.Split(alpn[0], ",")

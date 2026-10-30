@@ -174,3 +174,41 @@ func TestXHTTPExtraCanonicalization(t *testing.T) {
 		t.Fatal("wrong transport defaults")
 	}
 }
+
+func TestXHTTPProviderPaddingAliasAndExtraMode(t *testing.T) {
+	u, _ := url.Parse(xhttpURI("reality"))
+	q := u.Query()
+	q.Set("mode", "auto")
+	q.Set("x_padding_bytes", "100-1000")
+	q.Set("extra", `{"mode":"auto","xPaddingBytes":"100-1000"}`)
+	u.RawQuery = q.Encode()
+	n, err := parseNode(u.String())
+	if err != nil {
+		t.Fatal("provider XHTTP link rejected", err)
+	}
+	var extra map[string]any
+	if err = json.Unmarshal(n.XHTTP.Extra, &extra); err != nil || extra["xPaddingBytes"] != "100-1000" || n.XHTTP.Mode != "auto" {
+		t.Fatal("provider options lost", err)
+	}
+	q.Del("x_padding_bytes")
+	q.Set("extra", `{"xPaddingBytes":"100-1000"}`)
+	u.RawQuery = q.Encode()
+	equivalent, err := parseNode(u.String())
+	if err != nil || equivalent.ID != n.ID {
+		t.Fatal("redundant provider fields change identity", err)
+	}
+	q.Del("extra")
+	q.Set("x_padding_bytes", "100-1000")
+	u.RawQuery = q.Encode()
+	aliasOnly, err := parseNode(u.String())
+	if err != nil || aliasOnly.ID != n.ID {
+		t.Fatal("padding alias alone is not normalized", err)
+	}
+	q.Del("mode")
+	q.Set("extra", `{"mode":"stream-up","xPaddingBytes":"100-1000"}`)
+	u.RawQuery = q.Encode()
+	extraMode, err := parseNode(u.String())
+	if err != nil || extraMode.XHTTP.Mode != "stream-up" {
+		t.Fatal("extra mode not imported", err)
+	}
+}

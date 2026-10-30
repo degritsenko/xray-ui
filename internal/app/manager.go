@@ -377,11 +377,14 @@ func (m *Manager) RefreshAll(ctx context.Context) {
 
 // View types deliberately omit URLs, UUIDs, public keys and accepted raw configs.
 type NodeView struct {
-	ID     string       `json:"id"`
-	Name   string       `json:"name"`
-	Server string       `json:"server"`
-	Port   int          `json:"port"`
-	Probe  *ProbeResult `json:"probe,omitempty"`
+	Network  string       `json:"network"`
+	Security string       `json:"security"`
+	Flow     string       `json:"flow,omitempty"`
+	ID       string       `json:"id"`
+	Name     string       `json:"name"`
+	Server   string       `json:"server"`
+	Port     int          `json:"port"`
+	Probe    *ProbeResult `json:"probe,omitempty"`
 }
 type SubscriptionView struct {
 	Usage           *SubscriptionUsage `json:"usage,omitempty"`
@@ -417,11 +420,11 @@ type Snapshot struct {
 }
 
 func viewNode(n Node) NodeView {
-	return NodeView{ID: n.ID, Name: n.Name, Server: n.Server, Port: n.Port}
+	return NodeView{ID: n.ID, Name: n.Name, Server: n.Server, Port: n.Port, Network: n.transport(), Security: n.security(), Flow: n.Flow}
 }
 func (m *Manager) Snapshot() Snapshot {
 	s := m.stateCopy()
-	view := Snapshot{Subscriptions: []SubscriptionView{}, Running: m.core.Running(), Logs: m.logs.Entries(), Version: "ui-14"}
+	view := Snapshot{Subscriptions: []SubscriptionView{}, Running: m.core.Running(), Logs: m.logs.Entries(), Version: "ui-15"}
 	m.mu.RLock()
 	view.LastError = m.lastError
 	view.CoreVersion = m.coreVersion

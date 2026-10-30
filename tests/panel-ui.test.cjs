@@ -159,3 +159,19 @@ test('availability strip shows exactly five checks with newest on the right',asy
  assert.match(strips[0].attributes['aria-label'],/No data, No data, Passed, Failed, Passed/);
  for(const strip of strips)assert.equal(strip.children.length,5);
 });
+test('connection type distinguishes XHTTP and Vision in rows and active connection',async()=>{
+ const f=fixture();await flush();
+ const node=f.state.subscriptions[0].nodes[0];
+ node.network='xhttp';node.security='reality';
+ f.state.active.node=node;
+ await f.ids.get('core-restart').fire();
+ const walk=e=>[e,...e.children.flatMap(walk)];
+ assert.equal(walk(f.ids.get('server-list')).find(e=>e.className==='server-type').textContent,'VLESS · XHTTP · REALITY');
+ assert.equal(f.ids.get('active-type').textContent,'VLESS · XHTTP · REALITY');
+ node.network='tcp';node.flow='xtls-rprx-vision';
+ await f.ids.get('core-restart').fire();
+ assert.equal(f.ids.get('active-type').textContent,'VLESS · TCP · REALITY · Vision');
+ node.network='xhttp';node.security='none';node.flow='';
+ await f.ids.get('core-restart').fire();
+ assert.equal(f.ids.get('active-type').textContent,'VLESS · XHTTP');
+});

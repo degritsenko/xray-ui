@@ -67,6 +67,14 @@ function appendSubscriptionUsage(group,sub){
  }
  group.append(box);
 }
+function connectionType(node){
+ if(!node)return '';
+ const parts=['VLESS'];
+ if(node.network)parts.push(node.network==='raw'?'TCP':node.network.toUpperCase());
+ if(node.security&&node.security!=='none')parts.push(node.security.toUpperCase());
+ if(node.flow)parts.push(node.flow==='xtls-rprx-vision'?'Vision':node.flow);
+ return parts.join(' · ');
+}
 function render(){
  if(!state)return;
  const active=state.active,connected=state.running,status=$('connection-status');
@@ -75,6 +83,7 @@ function render(){
  status.className='status'+(connected?' connected':active?.enabled?' failed':'');
  $('active-name').textContent=active?.node.name||'Select a server';
  const activeSource=state.subscriptions.find(s=>s.id===active?.subscriptionID);
+ $('active-type').textContent=connectionType(active?.node);$('active-type').hidden=!active;
  $('active-detail').textContent=active?`${active.node.server}:${active.node.port}${activeSource?' · '+activeSource.name:''}`:'No server selected.';
  const activeResult=active?.node.probe||activeSource?.nodes.find(n=>n.id===active?.node.id)?.probe;
  const lastGood=activeResult?.reachable?activeResult:activeResult?.lastSuccess;
@@ -122,7 +131,7 @@ function render(){
     const row=element('div','',`server-row${chosen?' active':''}`),info=element('div','','server-info');
     const favorite=preferences.favorites.includes(nodeKey(sub,node));
     const star=element('button',favorite?'★':'☆',`favorite${favorite?' selected':''}`);star.type='button';star.setAttribute('data-focus','favorite:'+nodeKey(sub,node));star.disabled=busy;star.setAttribute('aria-label',`${favorite?'Remove':'Add'} ${node.name} ${favorite?'from':'to'} favorites`);star.setAttribute('aria-pressed',String(favorite));star.addEventListener('click',()=>togglePreference('favorites',nodeKey(sub,node)));row.append(star);
-    info.append(element('div',node.name,'server-name'),element('div',`${node.server}:${node.port}`,'server-address'));row.append(info);
+    info.append(element('div',node.name,'server-name'),element('div',connectionType(node),'server-type'),element('div',`${node.server}:${node.port}`,'server-address'));row.append(info);
     const result=node.probe,pending=state.probing&&state.probingNode===sub.id+'/'+node.id||checking&&checkScope.nodeID===node.id&&checkScope.subscriptionID===sub.id;
     const delay=element('button','',`server-delay${result&&!result.reachable?' unavailable':!result?' unknown':result.milliseconds>150?' slow':''}${stale(result,chosen&&connected)?' stale':''}`);delay.type='button';delay.setAttribute('data-focus','probe:'+nodeKey(sub,node));delay.disabled=busy||probing;delay.title='Check HTTPS latency through this VPN server';delay.setAttribute('aria-label',`Check ${node.name}`);
     const detail=pending?'Checking…':result?age(result.checkedAt):'Click to check';

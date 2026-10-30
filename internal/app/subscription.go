@@ -12,7 +12,7 @@ import (
 const MaxSubscriptionBytes = 2 * 1024 * 1024
 const MaxNodes = 2048
 
-var allowedParameters = map[string]bool{"security": true, "type": true, "flow": true, "pbk": true, "fp": true, "sni": true, "sid": true, "spx": true, "encryption": true, "headerType": true, "support-x25519mlkem768": true}
+var allowedParameters = map[string]bool{"security": true, "type": true, "flow": true, "pbk": true, "fp": true, "sni": true, "sid": true, "spx": true, "encryption": true, "headerType": true, "path": true, "host": true, "mode": true, "extra": true, "alpn": true, "support-x25519mlkem768": true}
 
 func validText(s string) bool {
 	return utf8.ValidString(s) && strings.IndexFunc(s, unicode.IsControl) < 0
@@ -40,12 +40,26 @@ func parseNode(line string) (Node, error) {
 			return Node{}, bad
 		}
 	}
-	if q.Get("security") != "reality" {
+	network := q.Get("type")
+	if network == "splithttp" {
+		network = "xhttp"
+	}
+	if network != "" && network != "tcp" && network != "raw" && network != "xhttp" {
 		return Node{}, bad
 	}
-	network := q.Get("type")
-	if network != "" && network != "tcp" && network != "raw" {
+	security := q.Get("security")
+	if network != "xhttp" && security != "reality" {
 		return Node{}, bad
+	}
+	if network == "xhttp" && security != "reality" && security != "tls" && security != "none" {
+		return Node{}, bad
+	}
+	if network != "xhttp" {
+		for _, key := range []string{"path", "host", "mode", "extra", "alpn"} {
+			if _, ok := q[key]; ok {
+				return Node{}, bad
+			}
+		}
 	}
 	if header := q.Get("headerType"); header != "" && header != "none" {
 		return Node{}, bad
@@ -64,6 +78,27 @@ func parseNode(line string) (Node, error) {
 		}
 	}
 	n := Node{Name: u.Fragment, Server: u.Hostname(), Port: port, UUID: u.User.Username(), Encryption: q.Get("encryption"), Flow: q.Get("flow"), Fingerprint: q.Get("fp"), SNI: q.Get("sni"), PublicKey: q.Get("pbk"), ShortID: q.Get("sid"), SpiderX: q.Get("spx")}
+	if network == "xhttp" {
+		n.Network = "xhttp"
+		n.Security = security
+		n.XHTTP = &XHTTPSettings{Host: q.Get("host"), Path: q.Get("path"), Mode: q.Get("mode")}
+		if n.XHTTP.Path == "" {
+			n.XHTTP.Path = "/"
+		}
+		if n.XHTTP.Mode == "" {
+			n.XHTTP.Mode = "auto"
+		}
+		if extra, ok := q["extra"]; ok {
+			canonical, err := canonicalXHTTPExtra([]byte(extra[0]))
+			if err != nil {
+				return Node{}, bad
+			}
+			n.XHTTP.Extra = canonical
+		}
+		if alpn, ok := q["alpn"]; ok {
+			n.ALPN = strings.Split(alpn[0], ",")
+		}
+	}
 	if n.Name == "" {
 		n.Name = n.Server
 	}
@@ -122,7 +157,7 @@ func ParseSubscription(data []byte) ([]Node, int, error) {
 		}
 	}
 	if len(nodes) == 0 {
-		return nil, skipped, errors.New("subscription has no supported VLESS TCP REALITY servers")
+		return nil, skipped, errors.New("subscription has no supported VLESS TCP/REALITY or XHTTP servers")
 	}
 	return nodes, skipped, nil
 }

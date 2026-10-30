@@ -63,7 +63,7 @@ Edit existing entries instead of duplicating them. Configure firewall, NAT, gate
 
 `SUBSCRIPTION_REFRESH_SECONDS=0` disables scheduled refresh.
 
-Supports plain-text and Base64 `vless://` subscriptions: **IPv4, TCP/RAW + REALITY**, with optional `xtls-rprx-vision`. Other protocols/transports are skipped. Source names come from `profile-title`, falling back to the subscription hostname.
+Supports plain-text and Base64 `vless://` subscriptions: **IPv4, TCP/RAW + REALITY** (with optional `xtls-rprx-vision`) and **XHTTP + REALITY/TLS/none**. XHTTP preserves `path`, `host`, `mode` (`auto`, `packet-up`, `stream-up`, `stream-one`), TLS `alpn` and supported JSON `extra` options. Separate `extra.downloadSettings` endpoints and Vision over XHTTP are not supported; unsupported entries are skipped. Existing TCP server IDs remain unchanged. Source names come from `profile-title`, falling back to the subscription hostname.
 
 The panel supports favorites, latency sorting and collapsible subscriptions. Favorites and list preferences are saved only in your browser.
 

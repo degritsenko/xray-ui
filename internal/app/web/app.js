@@ -9,7 +9,9 @@ async function api(path,options={}){
  return data;
 }
 function showLogin(){authGeneration++;probeController?.abort();probeController=null;checking=false;$('app').hidden=true;$('login-screen').hidden=false;state=null;csrf='';notice('')}
-function notice(message,error=false){$('notice').textContent=message;$('notice').classList.toggle('error',error);$('notice').hidden=!message}
+let noticeExpiresAt=0;
+function notice(message,error=false){$('notice').textContent=message;$('notice').classList.toggle('error',error);$('notice').hidden=!message;noticeExpiresAt=message&&!error?Date.now()+3000:0}
+setInterval(()=>{if(noticeExpiresAt&&Date.now()>=noticeExpiresAt)notice('')},250);
 async function load(){
  const generation=authGeneration;
  try{const next=await api('/state');if(generation!==authGeneration)return false;state=next;csrf=state.csrf;$('login-screen').hidden=true;$('app').hidden=false;render();return true}
@@ -117,12 +119,12 @@ function render(){
   const group=element('section','','subscription-group');group.setAttribute('aria-label',name);
   const heading=element('div','','subscription-heading'),info=element('div','','subscription-info');
   const title=element('button',`${collapsed?'›':'⌄'} ${name}`,'subscription-title');title.type='button';title.setAttribute('data-focus','group:'+groupKey(sub));title.setAttribute('aria-expanded',String(!collapsed));title.addEventListener('click',()=>togglePreference('collapsed',groupKey(sub)));
-  info.append(title,element('span',String(sub.nodes.length),'node-count'),element('span',updatedAt(sub),'hint'));
+  info.append(title,element('span',`${sub.nodes.length} servers`,'node-count'));
+  appendSubscriptionUsage(info,sub);
   const actions=element('div','','source-actions');
-  const refreshButton=element('button','↻ Refresh subscription','quiet');refreshButton.type='button';refreshButton.disabled=busy;refreshButton.setAttribute('aria-label',`Refresh ${name}`);refreshButton.addEventListener('click',()=>refresh(sub));
+  const refreshButton=element('button','↻','quiet');refreshButton.type='button';refreshButton.disabled=busy;refreshButton.title=`Refresh ${name} · ${updatedAt(sub)}`;refreshButton.setAttribute('aria-label',`Refresh ${name}`);refreshButton.addEventListener('click',()=>refresh(sub));
   const check=element('button','Check','quiet');check.type='button';check.disabled=busy||probing||!sub.nodes.length;check.setAttribute('aria-label',`Check ${name}`);check.addEventListener('click',()=>checkServers({subscriptionID:sub.id}));
   actions.append(refreshButton,check);heading.append(info,actions);group.append(heading);
-  appendSubscriptionUsage(group,sub);
   if(sub.error){const error=element('p',sub.error,'source-error');error.setAttribute('role','alert');group.append(error)}
   if(!collapsed){
    const list=element('div','','node-list');
@@ -142,11 +144,12 @@ function render(){
      const value=history[i-(5-history.length)],label=value===true?'Passed':value===false?'Failed':'No data';
      labels.push(label);const segment=element('span','',`history-segment${value===true?' passed':value===false?' failed':''}`);segment.setAttribute('aria-hidden','true');strip.append(segment);
     }
-    strip.title='Last 5 checks, oldest first: '+labels.join(', ');strip.setAttribute('aria-label',strip.title);info.append(strip);
+    strip.title='Last 5 checks, oldest first: '+labels.join(', ');strip.setAttribute('aria-label',strip.title);
 
     if(result&&!result.reachable&&result.error&&result.error!=='Check failed')info.append(element('div',result.error,'server-probe-error'));
     delay.append(element('span',latencyText(result),'delay-value'),element('span',detail,'checked-age'));
     if(result&&!result.reachable&&result.lastSuccess)delay.append(element('span',`Last: ${result.lastSuccess.milliseconds} ms · ${age(result.lastSuccess.checkedAt)}`,'last-success'));
+    delay.append(strip);
     delay.setAttribute('aria-label',`Check ${node.name}. ${latencyText(result)}. ${result?.error||''}. ${detail}`);
     delay.addEventListener('click',()=>checkServers({subscriptionID:sub.id,nodeID:node.id}));row.append(delay);
     if(chosen&&connected)row.append(element('span','● Connected','selected-badge'));

@@ -20,6 +20,9 @@ func validText(s string) bool {
 func parseNode(line string) (Node, error) {
 	bad := errors.New("unsupported or invalid entry")
 	u, err := url.Parse(line)
+	if err == nil && (u.Scheme == "hy2" || u.Scheme == "hysteria2") {
+		return parseHysteria(u)
+	}
 	if err != nil || u.Scheme != "vless" || u.User == nil || u.Opaque != "" || u.Path != "" {
 		return Node{}, bad
 	}
@@ -120,7 +123,7 @@ func ParseSubscription(data []byte) ([]Node, int, error) {
 			}
 		}
 		if err != nil {
-			return nil, 0, errors.New("expected VLESS links or a Base64 subscription")
+			return nil, 0, errors.New("expected proxy links or a Base64 subscription")
 		}
 		text = string(decoded)
 	}
@@ -147,7 +150,7 @@ func ParseSubscription(data []byte) ([]Node, int, error) {
 		}
 	}
 	if len(nodes) == 0 {
-		return nil, skipped, errors.New("subscription has no supported VLESS TCP/REALITY or XHTTP servers")
+		return nil, skipped, errors.New("subscription has no supported VLESS or Hysteria2 servers")
 	}
 	return nodes, skipped, nil
 }

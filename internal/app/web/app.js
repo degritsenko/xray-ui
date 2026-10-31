@@ -71,6 +71,7 @@ function appendSubscriptionUsage(group,sub){
 }
 function connectionType(node){
  if(!node)return '';
+ if(node.protocol==='hysteria2')return 'Hysteria2 · QUIC · TLS';
  const parts=['VLESS'];
  if(node.network)parts.push(node.network==='raw'?'TCP':node.network.toUpperCase());
  if(node.security&&node.security!=='none')parts.push(node.security.toUpperCase());
@@ -80,8 +81,7 @@ function connectionType(node){
 function render(){
  if(!state)return;
  const active=state.active,connected=state.running,status=$('connection-status');
- const version=state.coreVersion?` ${state.coreVersion}`:'';
- status.textContent=connected?`Xray${version} is running`:active?(active.enabled?'Xray is not running':'Stopped'):'Not connected';
+ status.textContent=connected?'Running':active?(active.enabled?'Not running':'Stopped'):'Not connected';
  status.className='status'+(connected?' connected':active?.enabled?' failed':'');
  $('active-name').textContent=active?.node.name||'Select a server';
  const activeSource=state.subscriptions.find(s=>s.id===active?.subscriptionID);
@@ -165,6 +165,7 @@ function render(){
  if(!subscriptions.length)rows.append(element('p','Set SUBSCRIPTION_URL in the container environment and restart the container.','empty'));
  if(focusedKey){const target=Array.from(rows.querySelectorAll?.('[data-focus]')||[]).find(e=>e.getAttribute('data-focus')===focusedKey);if(target&&!target.disabled)target.focus({preventScroll:true})}
  $('logs').textContent=state.logs.map(entry=>`${new Date(entry.time).toLocaleTimeString('en-GB')}  ${entry.message}`).join('\n')||'No events yet.';
+ $('core-version').textContent=state.coreVersion?'Xray '+state.coreVersion:'';
  $('version').textContent=`xray-ui · ${state.version}`;
  if(state.lastError&&!$('notice').textContent)notice(state.lastError,true);
 }

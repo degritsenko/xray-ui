@@ -13,22 +13,24 @@ import (
 )
 
 type Node struct {
-	Network     string         `json:"network,omitempty"`
-	Security    string         `json:"security,omitempty"`
-	XHTTP       *XHTTPSettings `json:"xhttp,omitempty"`
-	ALPN        []string       `json:"alpn,omitempty"`
-	ID          string         `json:"id"`
-	Name        string         `json:"name"`
-	Server      string         `json:"server"`
-	Port        int            `json:"port"`
-	UUID        string         `json:"uuid"`
-	Encryption  string         `json:"encryption"`
-	Flow        string         `json:"flow"`
-	Fingerprint string         `json:"fingerprint"`
-	SNI         string         `json:"sni"`
-	PublicKey   string         `json:"publicKey"`
-	ShortID     string         `json:"shortId"`
-	SpiderX     string         `json:"spiderX"`
+	Protocol    string            `json:"protocol,omitempty"`
+	Hysteria    *HysteriaSettings `json:"hysteria,omitempty"`
+	Network     string            `json:"network,omitempty"`
+	Security    string            `json:"security,omitempty"`
+	XHTTP       *XHTTPSettings    `json:"xhttp,omitempty"`
+	ALPN        []string          `json:"alpn,omitempty"`
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`
+	Server      string            `json:"server"`
+	Port        int               `json:"port"`
+	UUID        string            `json:"uuid"`
+	Encryption  string            `json:"encryption"`
+	Flow        string            `json:"flow"`
+	Fingerprint string            `json:"fingerprint"`
+	SNI         string            `json:"sni"`
+	PublicKey   string            `json:"publicKey"`
+	ShortID     string            `json:"shortId"`
+	SpiderX     string            `json:"spiderX"`
 }
 type Subscription struct {
 	Usage           *SubscriptionUsage `json:"usage,omitempty"`
@@ -71,6 +73,10 @@ func sourceHash(url string) string { s := sha256.Sum256([]byte(url)); return hex
 func nodeID(n Node) string {
 	// Match jq -cS (including its trailing newline) from the original importer.
 	fields := map[string]any{"server": n.Server, "port": n.Port, "uuid": n.UUID, "encryption": n.Encryption, "flow": n.Flow, "fingerprint": n.Fingerprint, "sni": n.SNI, "publicKey": n.PublicKey, "shortId": n.ShortID, "spiderX": n.SpiderX}
+	if n.Protocol == "hysteria2" {
+		fields["protocol"] = n.Protocol
+		fields["hysteria"] = n.Hysteria
+	}
 	if n.transport() == "xhttp" {
 		fields["network"] = "xhttp"
 		fields["security"] = n.security()
@@ -93,6 +99,9 @@ var keyPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{43}$`)
 var shortPattern = regexp.MustCompile(`^([0-9a-fA-F]{2}){0,8}$`)
 
 func validateNode(n Node) error {
+	if n.Protocol == "hysteria2" {
+		return validateHysteria(n)
+	}
 	if !uuidPattern.MatchString(n.UUID) || !hostPattern.MatchString(n.Server) || n.Port < 1 || n.Port > 65535 || n.Encryption != "none" || !validText(n.SNI) || !validText(n.Fingerprint) || !validText(n.SpiderX) {
 		return errors.New("invalid VLESS parameters")
 	}
@@ -121,13 +130,22 @@ func RenderConfig(n Node, ip, iface string) ([]byte, error) {
 		"inbounds":  []any{map[string]any{"tag": "tun-in", "port": 0, "protocol": "tun", "settings": map[string]any{"name": "tun0", "mtu": 1500}, "sniffing": map[string]any{"enabled": true, "destOverride": []string{"http", "tls", "quic"}, "routeOnly": true}}},
 		"outbounds": []any{map[string]any{"tag": "proxy", "protocol": "vless", "settings": map[string]any{"vnext": []any{map[string]any{"address": ip, "port": n.Port, "users": []any{user}}}}, "streamSettings": stream}},
 	}
+	if n.Protocol == "hysteria2" {
+		cfg["outbounds"] = []any{hysteriaOutbound(n, ip, iface)}
+	}
 	return json.MarshalIndent(cfg, "", "  ")
 }
 func configIP(data []byte) string {
 	var cfg struct {
 		Outbounds []struct {
-			Settings struct{ VNext []struct{ Address string } }
+			Settings struct {
+				Address string
+				VNext   []struct{ Address string }
+			}
 		}
+	}
+	if len(cfg.Outbounds) > 0 {
+		return cfg.Outbounds[0].Settings.Address
 	}
 	if json.Unmarshal(data, &cfg) == nil && len(cfg.Outbounds) > 0 && len(cfg.Outbounds[0].Settings.VNext) > 0 {
 		return cfg.Outbounds[0].Settings.VNext[0].Address

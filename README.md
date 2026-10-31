@@ -1,6 +1,6 @@
 # xray-ui
 
-Ready-to-run VLESS REALITY solution for MikroTik, powered by Xray with native TUN and a web panel.
+Ready-to-run VLESS and Hysteria2 client for MikroTik, powered by Xray with native TUN and a web panel.
 
 A complete containerized VPN client: Xray handles traffic through native TUN, while the dark web panel manages subscriptions, server selection and latency checks. Subscription URLs are configured only through container environment variables.
 
@@ -70,6 +70,8 @@ The panel supports favorites, latency sorting and collapsible subscriptions. Fav
 Automatic HTTPS checks run in the container: the full list every 10 minutes by default, and the active server about every minute. Choose Off, 5, 10 or 30 minutes in the panel, or check a subscription or a single server manually. Checks run sequentially without switching the active server. Results show their age; stale results are dimmed. Each server keeps its last five completed check results in memory; this history resets on restart. The automatic check interval resets at container startup.
 
 Startup loads subscriptions from environment variables and connects to the first working server. Later slow sources do not delay an available connection. Failed updates retain the previous configuration. Switching servers can interrupt connections. Latency is an HTTPS request through the VPN, not a bandwidth test.
+
+Hysteria2 subscriptions support `hy2://` and `hysteria2://` links with password or `username:password`, TLS SNI, optional `insecure=1`, and Salamander obfuscation (`obfs=salamander&obfs-password=...`). Requires outbound UDP connectivity. Port hopping and custom certificate pins are not supported; entries with unsupported parameters are skipped.
 
 ## Build your own image
 

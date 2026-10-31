@@ -61,10 +61,16 @@ func (m *Manager) updateSecrets(s State) {
 		secrets = append(secrets, sub.URL)
 		for _, n := range sub.Nodes {
 			secrets = append(secrets, n.UUID, n.PublicKey)
+			if n.Hysteria != nil {
+				secrets = append(secrets, n.Hysteria.Auth, n.Hysteria.ObfsPassword)
+			}
 		}
 	}
 	if s.Active != nil {
 		secrets = append(secrets, s.Active.Node.UUID, s.Active.Node.PublicKey)
+		if h := s.Active.Node.Hysteria; h != nil {
+			secrets = append(secrets, h.Auth, h.ObfsPassword)
+		}
 	}
 	m.logs.SetSecrets(secrets)
 }
@@ -414,6 +420,7 @@ func (m *Manager) RefreshAll(ctx context.Context) {
 
 // View types deliberately omit URLs, UUIDs, public keys and accepted raw configs.
 type NodeView struct {
+	Protocol string       `json:"protocol,omitempty"`
 	Network  string       `json:"network"`
 	Security string       `json:"security"`
 	Flow     string       `json:"flow,omitempty"`
@@ -457,11 +464,11 @@ type Snapshot struct {
 }
 
 func viewNode(n Node) NodeView {
-	return NodeView{ID: n.ID, Name: n.Name, Server: n.Server, Port: n.Port, Network: n.transport(), Security: n.security(), Flow: n.Flow}
+	return NodeView{Protocol: n.Protocol, ID: n.ID, Name: n.Name, Server: n.Server, Port: n.Port, Network: n.transport(), Security: n.security(), Flow: n.Flow}
 }
 func (m *Manager) Snapshot() Snapshot {
 	s := m.stateCopy()
-	view := Snapshot{Subscriptions: []SubscriptionView{}, Running: m.core.Running(), Logs: m.logs.Entries(), Version: "ui-17"}
+	view := Snapshot{Subscriptions: []SubscriptionView{}, Running: m.core.Running(), Logs: m.logs.Entries(), Version: "ui-18"}
 	m.mu.RLock()
 	view.LastError = m.lastError
 	view.CoreVersion = m.coreVersion

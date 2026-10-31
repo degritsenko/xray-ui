@@ -76,7 +76,7 @@ func (m *Manager) save(s State) error {
 		return errors.New("could not save settings; previous settings retained")
 	}
 	m.mu.Lock()
-	// Preserve probe history across unique XHTTP short-ID rotations only.
+	// Preserve probe history across unique REALITY short-ID rotations only.
 	for _, nextSub := range s.Subscriptions {
 		for _, oldSub := range m.state.Subscriptions {
 			if oldSub.ID != nextSub.ID {
@@ -84,14 +84,14 @@ func (m *Manager) save(s State) error {
 			}
 			oldGroups, nextGroups := map[string][]Node{}, map[string][]Node{}
 			for _, n := range oldSub.Nodes {
-				if n.transport() == "xhttp" {
+				if n.security() == "reality" {
 					n.ShortID = ""
 					key := nodeID(n)
 					oldGroups[key] = append(oldGroups[key], n)
 				}
 			}
 			for _, n := range nextSub.Nodes {
-				if n.transport() == "xhttp" {
+				if n.security() == "reality" {
 					n.ShortID = ""
 					key := nodeID(n)
 					nextGroups[key] = append(nextGroups[key], n)

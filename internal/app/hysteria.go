@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"errors"
 	"net/url"
 	"strconv"
@@ -11,6 +12,7 @@ type HysteriaSettings struct {
 	Auth         string `json:"auth"`
 	Insecure     bool   `json:"insecure,omitempty"`
 	ObfsPassword string `json:"obfsPassword,omitempty"`
+	Congestion   string `json:"congestion,omitempty"`
 }
 
 func validateHysteria(n Node) error {
@@ -37,7 +39,7 @@ func parseHysteria(u *url.URL) (Node, error) {
 			return Node{}, bad
 		}
 		switch k {
-		case "sni", "insecure", "obfs", "obfs-password":
+		case "sni", "insecure", "obfs", "obfs-password", "alpn", "security", "fm":
 		default:
 			return Node{}, bad
 		}
@@ -54,6 +56,31 @@ func parseHysteria(u *url.URL) (Node, error) {
 		auth += ":" + password
 	}
 	h := &HysteriaSettings{Auth: auth}
+	if security := q.Get("security"); security != "" && security != "tls" {
+		return Node{}, bad
+	}
+	if alpn := q.Get("alpn"); alpn != "" && alpn != "h3" {
+		return Node{}, bad
+	}
+	if raw := q.Get("fm"); raw != "" {
+		var mask struct {
+			QuicParams struct {
+				Debug      bool   `json:"debug"`
+				Congestion string `json:"congestion"`
+			} `json:"quicParams"`
+		}
+		decoder := json.NewDecoder(strings.NewReader(raw))
+		decoder.DisallowUnknownFields()
+		if len(raw) > 4096 || decoder.Decode(&mask) != nil {
+			return Node{}, bad
+		}
+		switch mask.QuicParams.Congestion {
+		case "", "bbr", "reno":
+			h.Congestion = mask.QuicParams.Congestion
+		default:
+			return Node{}, bad
+		}
+	}
 	switch q.Get("insecure") {
 	case "", "0", "false":
 	case "1", "true":
@@ -92,10 +119,17 @@ func hysteriaOutbound(n Node, ip, iface string) map[string]any {
 		"tlsSettings":      map[string]any{"serverName": name, "allowInsecure": n.Hysteria.Insecure, "alpn": []string{"h3"}},
 		"hysteriaSettings": map[string]any{"version": 2, "auth": n.Hysteria.Auth},
 	}
+	mask := map[string]any{}
+	if n.Hysteria.Congestion != "" {
+		mask["quicParams"] = map[string]any{"congestion": n.Hysteria.Congestion}
+	}
 	if n.Hysteria.ObfsPassword != "" {
-		stream["finalmask"] = map[string]any{"udp": []any{map[string]any{
+		mask["udp"] = []any{map[string]any{
 			"type": "salamander", "settings": map[string]any{"password": n.Hysteria.ObfsPassword},
-		}}}
+		}}
+	}
+	if len(mask) > 0 {
+		stream["finalmask"] = mask
 	}
 	return map[string]any{
 		"tag": "proxy", "protocol": "hysteria",

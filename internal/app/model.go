@@ -144,11 +144,15 @@ func configIP(data []byte) string {
 			}
 		}
 	}
-	if len(cfg.Outbounds) > 0 {
-		return cfg.Outbounds[0].Settings.Address
+	if json.Unmarshal(data, &cfg) != nil || len(cfg.Outbounds) == 0 {
+		return ""
 	}
-	if json.Unmarshal(data, &cfg) == nil && len(cfg.Outbounds) > 0 && len(cfg.Outbounds[0].Settings.VNext) > 0 {
-		return cfg.Outbounds[0].Settings.VNext[0].Address
+	settings := cfg.Outbounds[0].Settings
+	if settings.Address != "" {
+		return settings.Address
+	}
+	if len(settings.VNext) > 0 {
+		return settings.VNext[0].Address
 	}
 	return ""
 }

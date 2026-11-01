@@ -16,6 +16,9 @@ type HysteriaSettings struct {
 }
 
 func validateHysteria(n Node) error {
+	if n.Hysteria != nil && n.Hysteria.Insecure {
+		return errors.New("Hysteria2 insecure TLS is not supported by this Xray version")
+	}
 	if n.Hysteria == nil || n.Hysteria.Auth == "" || len(n.Hysteria.Auth) > 4096 ||
 		!validText(n.Hysteria.Auth) || !validText(n.Hysteria.ObfsPassword) ||
 		!hostPattern.MatchString(n.Server) || n.Port < 1 || n.Port > 65535 ||
@@ -84,7 +87,7 @@ func parseHysteria(u *url.URL) (Node, error) {
 	switch q.Get("insecure") {
 	case "", "0", "false":
 	case "1", "true":
-		h.Insecure = true
+		return Node{}, errors.New("Hysteria2 insecure TLS is not supported by this Xray version")
 	default:
 		return Node{}, bad
 	}
@@ -116,7 +119,7 @@ func hysteriaOutbound(n Node, ip, iface string) map[string]any {
 	stream := map[string]any{
 		"network": "hysteria", "security": "tls",
 		"sockopt":          map[string]any{"interface": iface},
-		"tlsSettings":      map[string]any{"serverName": name, "allowInsecure": n.Hysteria.Insecure, "alpn": []string{"h3"}},
+		"tlsSettings":      map[string]any{"serverName": name, "alpn": []string{"h3"}},
 		"hysteriaSettings": map[string]any{"version": 2, "auth": n.Hysteria.Auth},
 	}
 	mask := map[string]any{}

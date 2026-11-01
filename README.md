@@ -71,7 +71,7 @@ Automatic HTTPS checks run in the container: the full list every 10 minutes by d
 
 Startup loads subscriptions from environment variables and connects to the first working server. Later slow sources do not delay an available connection. Failed updates retain the previous configuration. Switching servers can interrupt connections. Latency is an HTTPS request through the VPN, not a bandwidth test.
 
-Hysteria2 subscriptions support `hy2://` and `hysteria2://` links with password or `username:password`, TLS SNI, optional `insecure=1`, and Salamander obfuscation (`obfs=salamander&obfs-password=...`). Requires outbound UDP connectivity. Port hopping and custom certificate pins are not supported; entries with unsupported parameters are skipped.
+Hysteria2 subscriptions support `hy2://` and `hysteria2://` links with password or `username:password`, TLS SNI and Salamander obfuscation (`obfs=salamander&obfs-password=...`). Requires outbound UDP connectivity and a valid TLS certificate. Insecure TLS (`insecure=1`), port hopping and custom certificate pins are not supported; entries with unsupported parameters are skipped.
 
 ## Build your own image
 

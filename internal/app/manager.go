@@ -318,7 +318,6 @@ func (m *Manager) refresh(ctx context.Context, id string, apply bool) error {
 	} else if saveErr := m.save(s); saveErr != nil {
 		return saveErr
 	}
-	m.logs.Add("Subscription updated")
 	if err != nil {
 		return &subscriptionRefreshError{cause: err}
 	}
@@ -468,7 +467,7 @@ func viewNode(n Node) NodeView {
 }
 func (m *Manager) Snapshot() Snapshot {
 	s := m.stateCopy()
-	view := Snapshot{Subscriptions: []SubscriptionView{}, Running: m.core.Running(), Logs: m.logs.Entries(), Version: "ui-20"}
+	view := Snapshot{Subscriptions: []SubscriptionView{}, Running: m.core.Running(), Logs: m.logs.Entries(), Version: "ui-21"}
 	m.mu.RLock()
 	view.LastError = m.lastError
 	view.CoreVersion = m.coreVersion

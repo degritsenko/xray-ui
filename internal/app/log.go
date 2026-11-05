@@ -23,6 +23,13 @@ type LogBuffer struct {
 
 var logUUID = regexp.MustCompile(`(?i)[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}`)
 var logURL = regexp.MustCompile(`https?://[^\s]+`)
+var xrayStartupLog = regexp.MustCompile(`^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}(\.\d+)? (\[Info\] infra/conf/serial: Reading config: |\[Warning\] core: Xray \S+ started$)`)
+
+func isXrayStartupNoise(line string) bool {
+	return strings.HasPrefix(line, "Xray ") && strings.Contains(line, " (Xray, Penetrates Everything.) ") ||
+		line == "A unified platform for anti-censorship." ||
+		xrayStartupLog.MatchString(line)
+}
 
 func NewLogBuffer(out io.Writer) *LogBuffer { return &LogBuffer{out: out} }
 func (l *LogBuffer) SetSecrets(s []string) {
@@ -61,7 +68,7 @@ func (l *LogBuffer) Write(p []byte) (int, error) {
 		}
 		line := strings.TrimSpace(l.pending[:index])
 		l.pending = l.pending[index+1:]
-		if line != "" {
+		if line != "" && !isXrayStartupNoise(line) {
 			l.addLocked(line)
 		}
 	}

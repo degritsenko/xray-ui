@@ -53,7 +53,7 @@ func RenderProbeConfig(n Node, ip, iface string, port int) ([]byte, error) {
 	if err = json.Unmarshal(data, &cfg); err != nil {
 		return nil, err
 	}
-	cfg["log"] = map[string]any{"loglevel": "none"}
+	cfg["log"] = map[string]any{"access": "none", "loglevel": xrayLogLevel("PROBE_LOG_LEVEL", "none")}
 	cfg["inbounds"] = []any{map[string]any{"listen": "127.0.0.1", "port": port, "protocol": "socks", "settings": map[string]any{"auth": "noauth", "udp": false}}}
 	return json.Marshal(cfg)
 }
@@ -107,6 +107,10 @@ func (p *XrayProber) probeOnce(ctx context.Context, n Node) (time.Duration, erro
 	// Release the reserved ephemeral port immediately before launching Xray.
 	listener.Close()
 	cmd := exec.CommandContext(ctx, p.Binary, "run", "-config", path)
+	if xrayLogLevel("PROBE_LOG_LEVEL", "none") != "none" {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
 	if err := cmd.Start(); err != nil {
 		return 0, &probeFailure{message: "Could not start check process", retryable: !errors.Is(err, os.ErrNotExist) && !errors.Is(err, os.ErrPermission)}
 	}

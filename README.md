@@ -58,6 +58,8 @@ Edit existing entries instead of duplicating them. Configure firewall, NAT, gate
 | `SUBSCRIPTION_REFRESH_SECONDS` | `600` (10 minutes, default) |
 | `PANEL_ADDRESS` | `0.0.0.0:8080` |
 | `PROBE_URL` | `https://www.gstatic.com/generate_204` |
+| `XRAY_LOG_LEVEL` | `warning` (main Xray: `debug`, `info`, `warning`, `error`, `none`) |
+| `PROBE_LOG_LEVEL` | `none` (server checks: same levels; set `debug` for diagnostics in container logs) |
 
 `PANEL_PASSWORD`: if set, uses that password; otherwise generates one and prints it to stdout at startup. Passwords must contain 4–32 characters. Restart the container after changing environment variables.
 

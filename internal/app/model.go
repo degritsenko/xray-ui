@@ -135,7 +135,7 @@ func RenderConfig(n Node, ip, iface string) ([]byte, error) {
 	}
 	stream := streamSettings(n, iface)
 	cfg := map[string]any{
-		"log":       map[string]any{"access": "none", "loglevel": "warning"},
+		"log":       map[string]any{"access": "none", "loglevel": xrayLogLevel("XRAY_LOG_LEVEL", "warning")},
 		"inbounds":  []any{map[string]any{"tag": "tun-in", "port": 0, "protocol": "tun", "settings": map[string]any{"name": "tun0", "mtu": 1500}, "sniffing": map[string]any{"enabled": true, "destOverride": []string{"http", "tls", "quic"}, "routeOnly": true}}},
 		"outbounds": []any{map[string]any{"tag": "proxy", "protocol": "vless", "settings": map[string]any{"vnext": []any{map[string]any{"address": ip, "port": n.Port, "users": []any{user}}}}, "streamSettings": stream}},
 	}

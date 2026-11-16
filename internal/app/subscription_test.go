@@ -25,6 +25,22 @@ func TestParseSubscriptionFormats(t *testing.T) {
 		}
 	}
 }
+
+func TestParseProviderFinalMaskAndGRPC(t *testing.T) {
+	links := "vless://11111111-1111-4111-8111-111111111111@vpn.example.com:443?encryption=none&flow=xtls-rprx-vision&type=tcp&security=reality&sni=example.com&fp=safari&pbk=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG&sid=a8&fm=%7B%22tcp%22%3A%5B%7B%22type%22%3A%22fragment%22%2C%22settings%22%3A%7B%22length%22%3A%2210-20%22%2C%22packets%22%3A%22tlshello%22%2C%22interval%22%3A%2210-20%22%7D%7D%5D%7D#VLESS\n" +
+		"vless://11111111-1111-4111-8111-111111111111@grpc.example.com:443?encryption=none&type=grpc&serviceName=r7Kp4mN9tQ2v&mode=gun&authority=grpc.example.com&security=tls&sni=grpc.example.com&fp=firefox&alpn=h2#GRPC"
+	nodes, skipped, err := ParseSubscription([]byte(links))
+	if err != nil || skipped != 0 || len(nodes) != 2 {
+		t.Fatalf("parse: nodes=%d skipped=%d err=%v", len(nodes), skipped, err)
+	}
+	if nodes[0].transport() != "tcp" || len(nodes[0].FinalMask) == 0 || nodes[1].Network != "grpc" || nodes[1].GRPC.ServiceName != "r7Kp4mN9tQ2v" || nodes[1].GRPC.MultiMode || len(nodes[1].ALPN) != 1 || nodes[1].ALPN[0] != "h2" {
+		t.Fatal("provider transport settings were not preserved")
+	}
+	config, err := RenderConfig(nodes[1], "192.0.2.1", "eth0")
+	if err != nil || !strings.Contains(string(config), `"grpcSettings"`) || !strings.Contains(string(config), `"serviceName": "r7Kp4mN9tQ2v"`) {
+		t.Fatalf("gRPC config: %s, err=%v", config, err)
+	}
+}
 func TestMixedProviderMetadata(t *testing.T) {
 	uri := strings.ReplaceAll(strings.ReplaceAll(sampleURI, "flow=xtls-rprx-vision&", ""), "fp=chrome", "fp=qq&support-x25519mlkem768=true")
 	nodes, skipped, err := ParseSubscription([]byte("wireguard://secret@host\n" + uri + "\ntuic://secret@host"))

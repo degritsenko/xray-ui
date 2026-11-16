@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"net/url"
 	"strings"
@@ -12,7 +13,7 @@ import (
 const MaxSubscriptionBytes = 2 * 1024 * 1024
 const MaxNodes = 2048
 
-var allowedParameters = map[string]bool{"security": true, "type": true, "flow": true, "pbk": true, "fp": true, "sni": true, "sid": true, "spx": true, "encryption": true, "headerType": true, "path": true, "host": true, "mode": true, "extra": true, "alpn": true, "x_padding_bytes": true, "support-x25519mlkem768": true}
+var allowedParameters = map[string]bool{"security": true, "type": true, "flow": true, "pbk": true, "fp": true, "sni": true, "sid": true, "spx": true, "encryption": true, "headerType": true, "path": true, "host": true, "mode": true, "extra": true, "alpn": true, "x_padding_bytes": true, "support-x25519mlkem768": true, "fm": true, "serviceName": true, "authority": true}
 
 func validText(s string) bool {
 	return utf8.ValidString(s) && strings.IndexFunc(s, unicode.IsControl) < 0
@@ -47,22 +48,31 @@ func parseNode(line string) (Node, error) {
 	if network == "splithttp" {
 		network = "xhttp"
 	}
-	if network != "" && network != "tcp" && network != "raw" && network != "xhttp" {
+	if network != "" && network != "tcp" && network != "raw" && network != "xhttp" && network != "grpc" {
 		return Node{}, bad
 	}
 	security := q.Get("security")
-	if network != "xhttp" && security != "reality" {
+	if network == "tcp" && security != "reality" || network == "grpc" && security != "reality" && security != "tls" {
 		return Node{}, bad
 	}
-	if network == "xhttp" && security != "reality" && security != "tls" && security != "none" {
+	if (network == "xhttp" || network == "grpc") && security != "reality" && security != "tls" && security != "none" {
 		return Node{}, bad
 	}
 	if network != "xhttp" {
-		for _, key := range []string{"path", "host", "mode", "extra", "alpn", "x_padding_bytes"} {
+		for _, key := range []string{"path", "host", "extra", "x_padding_bytes"} {
 			if _, ok := q[key]; ok {
 				return Node{}, bad
 			}
 		}
+	}
+	if network != "grpc" {
+		for _, key := range []string{"serviceName", "authority"} {
+			if _, ok := q[key]; ok {
+				return Node{}, bad
+			}
+		}
+	} else if q.Get("mode") != "gun" && q.Get("mode") != "multi" && q.Get("mode") != "" {
+		return Node{}, bad
 	}
 	if header := q.Get("headerType"); header != "" && header != "none" {
 		return Node{}, bad
@@ -91,6 +101,27 @@ func parseNode(line string) (Node, error) {
 		if alpn, ok := q["alpn"]; ok {
 			n.ALPN = strings.Split(alpn[0], ",")
 		}
+	}
+	if network == "grpc" {
+		n.Network = "grpc"
+		n.Security = security
+		n.GRPC = &GRPCSettings{Authority: q.Get("authority"), ServiceName: q.Get("serviceName"), MultiMode: q.Get("mode") == "multi"}
+		if alpn, ok := q["alpn"]; ok {
+			n.ALPN = strings.Split(alpn[0], ",")
+		}
+	}
+	if fm := q.Get("fm"); fm != "" {
+		var normalized any
+		decoder := json.NewDecoder(strings.NewReader(fm))
+		decoder.UseNumber()
+		if len(fm) > 16*1024 || decoder.Decode(&normalized) != nil {
+			return Node{}, bad
+		}
+		canonical, marshalErr := json.Marshal(normalized)
+		if marshalErr != nil || !validFinalMask(canonical) {
+			return Node{}, bad
+		}
+		n.FinalMask = canonical
 	}
 	if n.Name == "" {
 		n.Name = n.Server

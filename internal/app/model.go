@@ -18,6 +18,8 @@ type Node struct {
 	Network     string            `json:"network,omitempty"`
 	Security    string            `json:"security,omitempty"`
 	XHTTP       *XHTTPSettings    `json:"xhttp,omitempty"`
+	GRPC        *GRPCSettings     `json:"grpc,omitempty"`
+	FinalMask   json.RawMessage   `json:"finalMask,omitempty"`
 	ALPN        []string          `json:"alpn,omitempty"`
 	ID          string            `json:"id"`
 	Name        string            `json:"name"`
@@ -84,6 +86,13 @@ func nodeID(n Node) string {
 		if len(n.ALPN) > 0 {
 			fields["alpn"] = n.ALPN
 		}
+	}
+	if n.transport() == "grpc" {
+		fields["network"] = "grpc"
+		fields["grpc"] = n.GRPC
+	}
+	if len(n.FinalMask) > 0 {
+		fields["finalMask"] = n.FinalMask
 	}
 	var b bytes.Buffer
 	enc := json.NewEncoder(&b)

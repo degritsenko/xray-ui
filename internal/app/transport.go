@@ -16,6 +16,12 @@ type XHTTPSettings struct {
 	Extra json.RawMessage `json:"extra,omitempty"`
 }
 
+type GRPCSettings struct {
+	Authority   string `json:"authority,omitempty"`
+	ServiceName string `json:"serviceName"`
+	MultiMode   bool   `json:"multiMode,omitempty"`
+}
+
 // Empty fields retain the meaning of nodes saved before XHTTP support.
 func (n Node) transport() string {
 	if n.Network == "" || n.Network == "raw" {
@@ -68,12 +74,26 @@ func canonicalXHTTPExtra(raw []byte) (json.RawMessage, error) {
 func validateTransport(n Node) error {
 	bad := errors.New("invalid or unsupported VLESS transport")
 	if n.transport() == "tcp" {
-		if n.security() != "reality" || n.XHTTP != nil || len(n.ALPN) > 0 || n.Flow != "" && n.Flow != "xtls-rprx-vision" {
+		if n.security() != "reality" || n.XHTTP != nil || n.GRPC != nil || len(n.ALPN) > 0 || n.Flow != "" && n.Flow != "xtls-rprx-vision" {
 			return bad
 		}
 		return nil
 	}
-	if n.transport() != "xhttp" || n.Flow != "" || n.XHTTP == nil {
+	if n.transport() == "grpc" {
+		if n.security() != "reality" && n.security() != "tls" || n.XHTTP != nil || n.GRPC == nil || n.GRPC.ServiceName == "" || !validText(n.GRPC.ServiceName) || !validText(n.GRPC.Authority) || n.Flow != "" || len(n.FinalMask) > 0 && !validFinalMask(n.FinalMask) {
+			return bad
+		}
+		if n.security() != "tls" && len(n.ALPN) > 0 {
+			return bad
+		}
+		for _, protocol := range n.ALPN {
+			if protocol != "h2" {
+				return bad
+			}
+		}
+		return nil
+	}
+	if n.transport() != "xhttp" || n.Flow != "" || n.XHTTP == nil || n.GRPC != nil {
 		return bad
 	}
 	if n.security() != "reality" && n.security() != "tls" && n.security() != "none" {
@@ -126,7 +146,41 @@ func streamSettings(n Node, iface string) map[string]any {
 	if n.transport() == "xhttp" {
 		stream["xhttpSettings"] = n.XHTTP
 	}
+	if n.transport() == "grpc" {
+		stream["grpcSettings"] = n.GRPC
+	}
+	if len(n.FinalMask) > 0 {
+		var finalMask any
+		_ = json.Unmarshal(n.FinalMask, &finalMask)
+		stream["finalmask"] = finalMask
+	}
 	return stream
+}
+
+func validFinalMask(raw []byte) bool {
+	var mask struct {
+		TCP []struct {
+			Type     string `json:"type"`
+			Settings struct {
+				Packets  string   `json:"packets"`
+				Length   string   `json:"length"`
+				Lengths  []string `json:"lengths"`
+				Interval string   `json:"interval"`
+				Delays   []string `json:"delays"`
+			} `json:"settings"`
+		} `json:"tcp"`
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if len(raw) > 16*1024 || decoder.Decode(&mask) != nil || len(mask.TCP) == 0 {
+		return false
+	}
+	for _, layer := range mask.TCP {
+		if layer.Type != "fragment" || layer.Settings.Packets == "" || layer.Settings.Length == "" && len(layer.Settings.Lengths) == 0 {
+			return false
+		}
+	}
+	return true
 }
 
 // Providers may duplicate mode and padding inside and outside JSON extra.

@@ -75,7 +75,7 @@ func proxyFailure(err error, phase int32) error {
 	}
 	name := "VPN connection"
 	if phase == 1 {
-		name = "TLS handshake"
+		name = "VPN connection or test site TLS handshake"
 	} else if phase >= 2 {
 		name = "HTTPS response"
 	}

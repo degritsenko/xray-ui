@@ -4,7 +4,7 @@ Ready-to-run VLESS and Hysteria2 client for MikroTik, powered by Xray with nativ
 
 A complete containerized VPN client: Xray handles traffic through native TUN, while the dark web panel manages subscriptions, server selection and latency checks. Subscription URLs are configured only through container environment variables.
 
-Platforms: **Linux AMD64, ARM64, ARMv7 and ARMv5**. Xray 26.9.9.
+Platforms: **Linux AMD64, ARM64, ARMv7 and ARMv5**. Xray 26.10.31.
 
 AMD64, ARM64 and ARMv7 use Alpine 3.24.3. ARMv5 uses a minimal BusyBox runtime with Debian libraries: approximately **21.4 MB compressed / 55 MB unpacked**. The image platform is selected automatically.
 

@@ -36,6 +36,13 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     if [ "$TARGETARCH" = arm ]; then export GOARM="${TARGETVARIANT#v}"; fi; \
     CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -buildvcs=false -trimpath -ldflags="-s -w -buildid=" -o /out/xray-manager ./cmd/xray-manager
 
+FROM --platform=$BUILDPLATFORM alpine:${ALPINE_VERSION} AS packed
+RUN apk add --no-cache upx
+COPY --from=extract /out/xray /out/xray
+COPY --from=manager-build /out/xray-manager /out/xray-manager
+RUN upx --best --lzma /out/xray /out/xray-manager \
+    && upx -t /out/xray && upx -t /out/xray-manager
+
 FROM alpine:${ALPINE_VERSION} AS alpine-base
 RUN apk add --no-cache tzdata iproute2-minimal ca-certificates
 
@@ -79,9 +86,9 @@ RUN apk add --no-cache python3 openssl jq curl
 FROM base AS runtime
 LABEL org.opencontainers.image.title="xray-ui" \
       org.opencontainers.image.description="Ready-to-run VLESS REALITY solution for MikroTik with Xray, TUN and a web panel."
-COPY --from=extract /out/xray /opt/xray/xray
+COPY --from=packed /out/xray /opt/xray/xray
 COPY --from=extract /out/LICENSE /usr/share/licenses/xray/LICENSE
-COPY --from=manager-build /out/xray-manager /opt/xray-manager
+COPY --from=packed /out/xray-manager /opt/xray-manager
 EXPOSE 8080
 ENTRYPOINT ["/opt/xray-manager"]
 CMD []

@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -22,15 +23,22 @@ type Runtime interface {
 	Listen(context.Context, string) (net.Listener, error)
 }
 type LinuxRuntime struct {
-	iface   string
-	gateway string
-	client  *http.Client
+	trafficMu      sync.RWMutex
+	trafficStarted time.Time
+	iface          string
+	gateway        string
+	client         *http.Client
 }
 type route struct {
 	Dev     string `json:"dev"`
 	Gateway string `json:"gateway"`
 }
 
+func (n *LinuxRuntime) TrafficStarted() time.Time {
+	n.trafficMu.RLock()
+	defer n.trafficMu.RUnlock()
+	return n.trafficStarted
+}
 func (n *LinuxRuntime) Interface() string { return n.iface }
 func runIP(ctx context.Context, args ...string) error {
 	if exec.CommandContext(ctx, "ip", args...).Run() != nil {
@@ -112,6 +120,9 @@ func (n *LinuxRuntime) EnsureTunnel(ctx context.Context) error {
 		if err := runIP(ctx, "tuntap", "add", "dev", "tun0", "mode", "tun"); err != nil {
 			return err
 		}
+		n.trafficMu.Lock()
+		n.trafficStarted = time.Now().UTC()
+		n.trafficMu.Unlock()
 	}
 	for _, args := range [][]string{{"addr", "replace", "172.31.200.10/30", "dev", "tun0"}, {"link", "set", "dev", "tun0", "up"}, {"-4", "route", "replace", "default", "dev", "tun0", "metric", "0"}} {
 		if err := runIP(ctx, args...); err != nil {

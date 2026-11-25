@@ -8,15 +8,16 @@ import (
 )
 
 type ConnectionMetrics struct {
-	StartedAt     time.Time `json:"startedAt"`
-	SampledAt     time.Time `json:"sampledAt"`
-	DownloadBytes uint64    `json:"downloadBytes"`
-	UploadBytes   uint64    `json:"uploadBytes"`
-	Available     bool      `json:"available"`
+	StartedAt        time.Time `json:"startedAt"`
+	TrafficStartedAt time.Time `json:"trafficStartedAt"`
+	SampledAt        time.Time `json:"sampledAt"`
+	DownloadBytes    uint64    `json:"downloadBytes"`
+	UploadBytes      uint64    `json:"uploadBytes"`
+	Available        bool      `json:"available"`
 }
 
-func connectionMetrics(started time.Time) *ConnectionMetrics {
-	m := &ConnectionMetrics{StartedAt: started}
+func connectionMetrics(started, trafficStarted time.Time) *ConnectionMetrics {
+	m := &ConnectionMetrics{StartedAt: started, TrafficStartedAt: trafficStarted}
 	read := func(name string) (uint64, error) {
 		data, err := os.ReadFile("/sys/class/net/tun0/statistics/" + name)
 		if err != nil {
@@ -24,9 +25,9 @@ func connectionMetrics(started time.Time) *ConnectionMetrics {
 		}
 		return strconv.ParseUint(strings.TrimSpace(string(data)), 10, 64)
 	}
-	// TUN TX delivers downloaded traffic to the kernel; RX receives uploads.
-	down, downErr := read("tx_bytes")
-	up, upErr := read("rx_bytes")
+	// RX is traffic received by the kernel from Xray; TX is sent to Xray.
+	down, downErr := read("rx_bytes")
+	up, upErr := read("tx_bytes")
 	m.SampledAt = time.Now().UTC()
 	m.Available = downErr == nil && upErr == nil
 	if m.Available {

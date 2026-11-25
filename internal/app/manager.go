@@ -468,10 +468,8 @@ func viewNode(n Node) NodeView {
 }
 func (m *Manager) Snapshot() Snapshot {
 	s := m.stateCopy()
-	view := Snapshot{Subscriptions: []SubscriptionView{}, Running: m.core.Running(), Logs: m.logs.Entries(), Version: "ui-27"}
-	if core, ok := m.core.(interface{ ConnectionStarted() time.Time }); ok && view.Running {
-		view.Connection = connectionMetrics(core.ConnectionStarted())
-	}
+	view := Snapshot{Subscriptions: []SubscriptionView{}, Running: m.core.Running(), Logs: m.logs.Entries(), Version: "ui-35"}
+	view.Connection = m.ConnectionMetrics()
 	m.mu.RLock()
 	view.LastError = m.lastError
 	view.CoreVersion = m.coreVersion
@@ -517,4 +515,15 @@ func (m *Manager) Snapshot() Snapshot {
 		}
 	}
 	return view
+}
+
+func (m *Manager) ConnectionMetrics() *ConnectionMetrics {
+	if core, ok := m.core.(interface{ ConnectionStarted() time.Time }); ok && m.core.Running() {
+		var trafficStarted time.Time
+		if network, ok := m.network.(interface{ TrafficStarted() time.Time }); ok {
+			trafficStarted = network.TrafficStarted()
+		}
+		return connectionMetrics(core.ConnectionStarted(), trafficStarted)
+	}
+	return nil
 }

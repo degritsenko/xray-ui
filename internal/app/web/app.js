@@ -78,7 +78,7 @@ function connectionType(node){
  if(node.flow)parts.push(node.flow==='xtls-rprx-vision'?'Vision':node.flow);
  return parts.join(' · ');
 }
-let trafficSample=null,trafficRate=null;
+let trafficSample=null,trafficRate=null,trafficTotals=null;
 function renderConnectionMetrics(){
  const metric=state?.connection;
  $('connection-metrics').hidden=!state?.running||!metric;
@@ -92,9 +92,16 @@ function renderConnectionMetrics(){
   trafficSample=metric;
  }
  const rate=value=>value.toLocaleString('en-GB',{maximumFractionDigits:1,minimumFractionDigits:1})+' Mbps';
- $('connection-speed').textContent=trafficRate?`↓ ${rate(trafficRate.down)} · ↑ ${rate(trafficRate.up)}`:'↓ — · ↑ —';
+ $('connection-down-speed').textContent=trafficRate?rate(trafficRate.down):'—';
+ $('connection-up-speed').textContent=trafficRate?rate(trafficRate.up):'—';
+ if(metric.available&&(!trafficTotals||trafficTotals.since!==metric.trafficStartedAt||now-trafficTotals.at>=60000||metric.downloadBytes<trafficTotals.down||metric.uploadBytes<trafficTotals.up))trafficTotals={since:metric.trafficStartedAt,at:now,down:metric.downloadBytes,up:metric.uploadBytes};
+ $('connection-down-total').textContent=metric.available&&trafficTotals?formatBytes(trafficTotals.down):'—';
+ $('connection-up-total').textContent=metric.available&&trafficTotals?formatBytes(trafficTotals.up):'—';
+ const trafficSince=Date.parse(metric.trafficStartedAt);
+ const since=Number.isFinite(trafficSince)&&trafficSince>0?new Date(trafficSince).toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'start';
+ $('connection-traffic-since').textContent=`Traffic since ${since}`;
  const seconds=elapsed(metric.startedAt);
- $('connection-uptime').textContent=seconds===null?'Connected':`Connected ${Math.floor(seconds/3600)}h ${Math.floor(seconds/60)%60}m ${Math.floor(seconds)%60}s`;
+ $('connection-uptime').textContent=seconds===null?'—':`${Math.floor(seconds/3600)}h ${Math.floor(seconds/60)%60}m`;
 }
 function render(){
  if(!state)return;
@@ -211,4 +218,11 @@ $('auto-check-interval').addEventListener('change',async()=>{
  catch(error){if(generation===authGeneration)notice(error.message,true)}
  finally{autoCheckUpdating=false;if(generation===authGeneration)await load()}
 });
-load();setInterval(()=>{if(!$('app').hidden&&!document.hidden)load()},2000);
+load();setInterval(()=>{if(!$('app').hidden&&!document.hidden)load()},5000);
+
+let loadingMetrics=false;
+setInterval(async()=>{
+ if(loadingMetrics||!state||document.hidden||$('app').hidden)return;
+ const generation=authGeneration;loadingMetrics=true;
+ try{const metric=await api('/connection');if(generation===authGeneration&&state&&metric&&state.running){state.connection=metric;renderConnectionMetrics()}}catch{}finally{loadingMetrics=false}
+},1000);

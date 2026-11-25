@@ -31,6 +31,9 @@ func NewServer(manager *Manager, auth *Auth) http.Handler {
 	s.mux.HandleFunc("GET /login", func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, "/", http.StatusSeeOther) })
 	s.mux.HandleFunc("POST /api/logout", s.protected(s.logout))
 	s.mux.HandleFunc("GET /api/state", s.protected(s.state))
+	s.mux.HandleFunc("GET /api/connection", s.protected(func(w http.ResponseWriter, r *http.Request, _ webSession) {
+		writeJSON(w, 200, s.manager.ConnectionMetrics())
+	}))
 	s.mux.HandleFunc("POST /api/subscriptions/{id}/refresh", s.protected(s.refresh))
 	s.mux.HandleFunc("POST /api/probe", s.protected(s.probe))
 	s.mux.HandleFunc("POST /api/probe/settings", s.protected(s.probeSettings))

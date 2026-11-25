@@ -36,3 +36,5 @@ button,input,select{font-size:14px;min-height:38px}input,select{border-color:#3b
 .server-delay .probe-history{margin:7px 0 0 auto}
 .server-row{min-height:80px}
 @media(max-width:700px){.connection-card{gap:12px;padding:12px}.connection-info h1{font-size:18px}.connection-actions{width:auto;margin-left:auto}.subscription-info .subscription-usage{flex-basis:100%}.subscription-info .usage-summary{flex-wrap:wrap;gap:4px 12px}.server-delay .probe-history{width:70px}.server-row{min-height:84px}}
+
+.connection-metrics{font-size:14px;font-variant-numeric:tabular-nums;flex-shrink:0}.connection-metrics .hint{margin-top:5px;font-size:12px}@media(max-width:700px){.connection-metrics{flex-basis:100%}}

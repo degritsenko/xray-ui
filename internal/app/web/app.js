@@ -78,8 +78,27 @@ function connectionType(node){
  if(node.flow)parts.push(node.flow==='xtls-rprx-vision'?'Vision':node.flow);
  return parts.join(' · ');
 }
+let trafficSample=null,trafficRate=null;
+function renderConnectionMetrics(){
+ const metric=state?.connection;
+ $('connection-metrics').hidden=!state?.running||!metric;
+ if(!state?.running||!metric){trafficSample=null;trafficRate=null;return}
+ const now=Date.parse(metric.sampledAt),previous=trafficSample;
+ if(!metric.available){trafficSample=null;trafficRate=null}
+ else if(!previous||previous.startedAt!==metric.startedAt||metric.downloadBytes<previous.downloadBytes||metric.uploadBytes<previous.uploadBytes){trafficSample=metric;trafficRate=null}
+ else if(now>Date.parse(previous.sampledAt)){
+  const seconds=(now-Date.parse(previous.sampledAt))/1000;
+  trafficRate=seconds<=30?{down:(metric.downloadBytes-previous.downloadBytes)*8/seconds/1e6,up:(metric.uploadBytes-previous.uploadBytes)*8/seconds/1e6}:null;
+  trafficSample=metric;
+ }
+ const rate=value=>value.toLocaleString('en-GB',{maximumFractionDigits:1,minimumFractionDigits:1})+' Mbps';
+ $('connection-speed').textContent=trafficRate?`↓ ${rate(trafficRate.down)} · ↑ ${rate(trafficRate.up)}`:'↓ — · ↑ —';
+ const seconds=elapsed(metric.startedAt);
+ $('connection-uptime').textContent=seconds===null?'Connected':`Connected ${Math.floor(seconds/3600)}h ${Math.floor(seconds/60)%60}m ${Math.floor(seconds)%60}s`;
+}
 function render(){
  if(!state)return;
+ renderConnectionMetrics();
  const active=state.active,connected=state.running,status=$('connection-status');
  status.textContent=connected?'Running':active?(active.enabled?'Not running':'Stopped'):'Not connected';
  status.className='status'+(connected?' connected':active?.enabled?' failed':'');
@@ -192,4 +211,4 @@ $('auto-check-interval').addEventListener('change',async()=>{
  catch(error){if(generation===authGeneration)notice(error.message,true)}
  finally{autoCheckUpdating=false;if(generation===authGeneration)await load()}
 });
-load();setInterval(()=>{if(!$('app').hidden&&!document.hidden)load()},5000);
+load();setInterval(()=>{if(!$('app').hidden&&!document.hidden)load()},2000);

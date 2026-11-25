@@ -448,6 +448,7 @@ type ActiveView struct {
 	SourceChanged  bool     `json:"sourceChanged"`
 }
 type Snapshot struct {
+	Connection           *ConnectionMetrics `json:"connection,omitempty"`
 	CoreVersion          string             `json:"coreVersion"`
 	Subscriptions        []SubscriptionView `json:"subscriptions"`
 	Active               *ActiveView        `json:"active"`
@@ -467,7 +468,10 @@ func viewNode(n Node) NodeView {
 }
 func (m *Manager) Snapshot() Snapshot {
 	s := m.stateCopy()
-	view := Snapshot{Subscriptions: []SubscriptionView{}, Running: m.core.Running(), Logs: m.logs.Entries(), Version: "ui-26"}
+	view := Snapshot{Subscriptions: []SubscriptionView{}, Running: m.core.Running(), Logs: m.logs.Entries(), Version: "ui-27"}
+	if core, ok := m.core.(interface{ ConnectionStarted() time.Time }); ok && view.Running {
+		view.Connection = connectionMetrics(core.ConnectionStarted())
+	}
 	m.mu.RLock()
 	view.LastError = m.lastError
 	view.CoreVersion = m.coreVersion

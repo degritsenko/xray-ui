@@ -21,10 +21,11 @@ type Core interface {
 	Running() bool
 }
 type coreProcess struct {
-	cmd    *exec.Cmd
-	done   chan struct{}
-	config []byte
-	dir    string
+	started time.Time
+	cmd     *exec.Cmd
+	done    chan struct{}
+	config  []byte
+	dir     string
 }
 type Runner struct {
 	mu          sync.Mutex
@@ -104,7 +105,7 @@ func (r *Runner) startPrepared(ctx context.Context, dir string, data []byte) (*c
 	if cmd.Start() != nil {
 		return nil, errors.New("could not start Xray")
 	}
-	p := &coreProcess{cmd: cmd, done: make(chan struct{}), config: append([]byte(nil), data...), dir: dir}
+	p := &coreProcess{started: time.Now(), cmd: cmd, done: make(chan struct{}), config: append([]byte(nil), data...), dir: dir}
 	go func() { _ = cmd.Wait(); close(p.done) }()
 	select {
 	case <-p.done:
@@ -182,4 +183,13 @@ func (r *Runner) apply(ctx context.Context, data []byte, commit func() error, fo
 		_ = os.RemoveAll(old.dir)
 	}
 	return nil
+}
+
+// ConnectionStarted reports the lifetime of the main process, excluding probes.
+func (r *Runner) ConnectionStarted() time.Time {
+	p := r.status.Load()
+	if !running(p) {
+		return time.Time{}
+	}
+	return p.started
 }

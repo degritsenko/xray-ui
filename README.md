@@ -2,6 +2,8 @@
  
 Ready-to-run VLESS and Hysteria2 client for MikroTik, powered by Xray with native TUN and a web panel. [Docker Hub](https://hub.docker.com/r/gritsenko/xray-mikrotik-ui/tags?name=latest)
 
+### [How to Route Traffic Through the Tunnel(RU)](https://gist.github.com/degritsenko/64bd43e0d854fc730b71a45872be3542)
+
 A complete containerized VPN client: Xray handles traffic through native TUN, while the dark web panel manages subscriptions, server selection and latency checks. Subscription URLs are configured only through container environment variables.
 
 Platforms: **Linux AMD64, ARM64, ARMv7 and ARMv5**. Xray 26.11.9.

@@ -56,10 +56,20 @@ func (m *Manager) ProbeAll(ctx context.Context) error { return m.ProbeScope(ctx,
 func (m *Manager) bootstrapProbed(ctx context.Context) error {
 	m.probeMu.Lock()
 	defer m.probeMu.Unlock()
+	startupCtx, cancelStartup := context.WithCancel(ctx)
 	m.mu.Lock()
+	m.startupProbeCancel = cancelStartup
 	m.probing = true
 	m.mu.Unlock()
-	defer func() { m.mu.Lock(); m.probing = false; m.probingNode = ""; m.mu.Unlock() }()
+	defer func() {
+		cancelStartup()
+		m.mu.Lock()
+		m.startupProbeCancel = nil
+		m.probing = false
+		m.probingNode = ""
+		m.mu.Unlock()
+	}()
+	ctx = startupCtx
 	m.op.Lock()
 	initial := m.stateCopy()
 	intent := m.intent

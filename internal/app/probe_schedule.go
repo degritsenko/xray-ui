@@ -53,8 +53,29 @@ func (m *Manager) ProbeScope(ctx context.Context, subID, nodeID string) error {
 	if m.prober == nil {
 		return errors.New("server probing is unavailable")
 	}
-	if !m.probeMu.TryLock() {
-		return errors.New("server check is already running")
+	m.mu.Lock()
+	cancel := m.autoProbeCancel
+	if cancel == nil {
+		cancel = m.startupProbeCancel
+	}
+	if cancel != nil {
+		cancel()
+	}
+	m.mu.Unlock()
+	if cancel == nil {
+		if !m.probeMu.TryLock() {
+			return errors.New("server check is already running")
+		}
+	} else {
+		ticker := time.NewTicker(25 * time.Millisecond)
+		defer ticker.Stop()
+		for !m.probeMu.TryLock() {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-ticker.C:
+			}
+		}
 	}
 	defer m.probeMu.Unlock()
 	targets, err := m.probeTargets(subID, nodeID)

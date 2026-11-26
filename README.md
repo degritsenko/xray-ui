@@ -4,13 +4,10 @@ Ready-to-run VLESS and Hysteria2 client for MikroTik, powered by Xray with nativ
 
 ### [How to Route Traffic Through the Tunnel(RU)](https://gist.github.com/degritsenko/64bd43e0d854fc730b71a45872be3542)
 
-A complete containerized VPN client: Xray handles traffic through native TUN, while the dark web panel manages subscriptions, server selection and latency checks. Subscription URLs are configured only through container environment variables.
+A complete containerized VPN client: Xray handles traffic through native TUN, while the dark web panel manages subscriptions, server selection and latency checks. Subscription URLs and direct server links are configured through container environment variables.
 
 Platforms: **Linux AMD64, ARM64, ARMv7 and ARMv5**. Xray 26.11.9.
 
-AMD64, ARM64 and ARMv7 use Alpine 3.24.3. ARMv5 uses a minimal BusyBox runtime with Debian libraries: approximately **21.4 MB compressed / 55 MB unpacked**. The image platform is selected automatically.
-
-The ARMv5 build is intended for RouterOS devices with EN7562CT CPUs, including hEX Refresh and hAP ax S. Startup, panel sign-in and TUN creation have been tested under ARMv5 emulation; VPN operation on these devices has not yet been verified.
 
 The dark panel includes favorites, latency sorting, automatic HTTPS checks and the last five check results per server. Subscription traffic, quota and expiry are shown when reported by the provider. Failed checks retain the last successful latency; subscription errors stay beside the affected source.
 
@@ -32,17 +29,18 @@ Add the environment variables:
 /container/envs/add list=xray-ui key=PANEL_PASSWORD value="REPLACE_WITH_YOUR_PASSWORD"
 ```
 
-Optional second subscription:
+Optional second subscription or direct server:
 
 ```routeros
 /container/envs/add list=xray-ui key=SUBSCRIPTION_URL_2 value="https://another-provider.example/sub/YOUR_TOKEN"
+/container/envs/add list=xray-ui key=SRV1 value="vless://YOUR_SERVER_LINK"
 ```
 
 Create the container. Set `PANEL_PASSWORD` to use your own password (4–32 characters), or omit it to generate one and print it to stdout at startup (the MikroTik container log):
 
 ```routeros
 /container/config/set registry-url=https://registry-1.docker.io
-/container/add name=xray-ui remote-image=gritsenko/xray-ui:latest interface=xray-veth envlists=xray-ui dns=172.18.20.5 root-dir=/docker/xray-ui logging=yes start-on-boot=yes
+/container/add name=xray-ui remote-image=gritsenko/xray-mikrotik-ui:latest interface=xray-veth envlists=xray-ui dns=172.18.20.5 root-dir=/docker/xray-ui logging=yes start-on-boot=yes
 /container/start [find where name="xray-ui"]
 ```
 
@@ -56,6 +54,7 @@ Edit existing entries instead of duplicating them. Configure firewall, NAT, gate
 |---|---|
 | `SUBSCRIPTION_URL` | `https://provider.example/sub/YOUR_TOKEN` |
 | `SUBSCRIPTION_URL_2` | `https://another-provider.example/sub/YOUR_TOKEN` (optional; up to `_16`) |
+| `SRV1`, `SRV2` … `SRV64` | Direct `vless://`, `hysteria2://` or `hy2://` links (optional) |
 | `PANEL_PASSWORD` | `REPLACE_WITH_YOUR_PASSWORD` |
 | `SUBSCRIPTION_REFRESH_SECONDS` | `600` (10 minutes, default) |
 | `PANEL_ADDRESS` | `0.0.0.0:8080` |
@@ -67,15 +66,21 @@ Edit existing entries instead of duplicating them. Configure firewall, NAT, gate
 
 `SUBSCRIPTION_REFRESH_SECONDS=0` disables scheduled refresh.
 
-Supports plain-text and Base64 `vless://` subscriptions: **IPv4, TCP/RAW + REALITY** (with optional `xtls-rprx-vision`) and **XHTTP + REALITY/TLS/none**. XHTTP preserves `path`, `host`, `mode` (`auto`, `packet-up`, `stream-up`, `stream-one`), TLS `alpn` and supported JSON `extra` options. Provider aliases `x_padding_bytes` and `mode` inside `extra` are normalized. Separate `extra.downloadSettings` endpoints and Vision over XHTTP are not supported; unsupported entries are skipped. Existing TCP server IDs remain unchanged. Source names come from `profile-title`, falling back to the subscription hostname.
+Subscriptions accept plain-text or Base64 lists of supported VLESS and Hysteria2 links. VLESS supports TCP/RAW + REALITY (including Vision), XHTTP + REALITY/TLS/none and gRPC + REALITY/TLS. Source names come from `profile-title`, falling back to the subscription hostname.
 
-The panel supports favorites, latency sorting and collapsible subscriptions. Favorites and list preferences are saved only in your browser.
+Direct links in `SRV1`–`SRV64` appear under **Direct servers**, before subscriptions. Standard `vless://`, `hysteria2://` and `hy2://` links are supported, as are Base64 VLESS links for gRPC + TLS or TCP + REALITY + Vision. Direct links are read at startup; change the environment variable and restart the container to update one.
 
-Automatic HTTPS checks run in the container: the full list every 10 minutes by default, and the active server about every minute. Choose Off, 5, 10 or 30 minutes in the panel, or check a subscription or a single server manually. Checks run sequentially without switching the active server. Results show their age; stale results are dimmed. Each server keeps its last five completed check results in memory; this history resets on restart. The automatic check interval resets at container startup.
+Hysteria2 supports `sni` or `peer` for TLS and optional Salamander obfuscation. It requires outbound UDP and a valid TLS certificate. Insecure TLS, port hopping and certificate pins such as `hpkp` are not supported.
 
-Startup loads subscriptions from environment variables and connects to the first working server. Later slow sources do not delay an available connection. Failed updates retain the previous configuration. Switching servers can interrupt connections. Latency is an HTTPS request through the VPN, not a bandwidth test.
+### Server checks
 
-Hysteria2 subscriptions support `hy2://` and `hysteria2://` links with password or `username:password`, TLS SNI and Salamander obfuscation (`obfs=salamander&obfs-password=...`). Requires outbound UDP connectivity and a valid TLS certificate. Insecure TLS (`insecure=1`), port hopping and custom certificate pins are not supported; entries with unsupported parameters are skipped.
+The panel checks servers sequentially using a temporary Xray process. It makes an HTTPS request through each VPN server to `PROBE_URL` (default: `https://www.gstatic.com/generate_204`), then stops the temporary process. The active connection stays running. A failed check is retried once; its last successful result and the five latest check outcomes are shown in the panel. Latency measures the request through the VPN, not bandwidth.
+
+Automatic checks run every 10 minutes by default, with the active server checked approximately every minute. Select Off, 5, 10 or 30 minutes in the panel. Check all servers, one group or an individual server manually; a manual check interrupts a background check. Results and the interval reset when the container restarts.
+
+The panel shows current tunnel speed, traffic since container startup, connection time, favorites and sorting by latency. Subscription traffic, quota and expiry are shown when provided by the subscription. Favorites and display preferences are stored in the browser.
+
+At startup, the manager loads sources from the environment and connects to the first working server. Failed subscription updates retain the previous configuration. Switching servers can interrupt existing connections.
 
 ## Build your own image
 

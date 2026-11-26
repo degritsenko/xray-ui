@@ -29,6 +29,7 @@ type Manager struct {
 	nextActiveProbeAt    time.Time
 	probingNode          string
 	autoProbeCancel      context.CancelFunc
+	startupProbeCancel   context.CancelFunc
 }
 
 func NewManager(store StateStore, state State, network Runtime, core Core, logs *LogBuffer) *Manager {
@@ -234,6 +235,9 @@ func (m *Manager) refresh(ctx context.Context, id string, apply bool) error {
 		return err
 	}
 	sub := &s.Subscriptions[index]
+	if sub.Direct {
+		return nil
+	}
 	sub.AttemptedAt = time.Now().UTC()
 	var body []byte
 	var title string
@@ -430,6 +434,7 @@ type NodeView struct {
 	Probe    *ProbeResult `json:"probe,omitempty"`
 }
 type SubscriptionView struct {
+	Direct          bool               `json:"direct,omitempty"`
 	Usage           *SubscriptionUsage `json:"usage,omitempty"`
 	PreferenceID    string             `json:"preferenceID"`
 	ID              string             `json:"id"`
@@ -458,6 +463,7 @@ type Snapshot struct {
 	CSRF                 string             `json:"csrf,omitempty"`
 	Version              string             `json:"version"`
 	Probing              bool               `json:"probing"`
+	ProbingAutomatic     bool               `json:"probingAutomatic"`
 	ProbingNode          string             `json:"probingNode"`
 	ProbeIntervalSeconds int64              `json:"probeIntervalSeconds"`
 	NextProbeAt          time.Time          `json:"nextProbeAt"`
@@ -468,12 +474,13 @@ func viewNode(n Node) NodeView {
 }
 func (m *Manager) Snapshot() Snapshot {
 	s := m.stateCopy()
-	view := Snapshot{Subscriptions: []SubscriptionView{}, Running: m.core.Running(), Logs: m.logs.Entries(), Version: "ui-41"}
+	view := Snapshot{Subscriptions: []SubscriptionView{}, Running: m.core.Running(), Logs: m.logs.Entries(), Version: "ui-47"}
 	view.Connection = m.ConnectionMetrics()
 	m.mu.RLock()
 	view.LastError = m.lastError
 	view.CoreVersion = m.coreVersion
 	view.Probing = m.probing
+	view.ProbingAutomatic = m.probing && (m.autoProbeCancel != nil || m.startupProbeCancel != nil)
 	view.ProbingNode = m.probingNode
 	view.ProbeIntervalSeconds = m.probeIntervalSeconds
 	view.NextProbeAt = m.nextProbeAt
@@ -489,13 +496,13 @@ func (m *Manager) Snapshot() Snapshot {
 			host = u.Host
 		}
 		name := sub.Title
-		if name == "" && u != nil {
+		if name == "" && u != nil && !sub.Direct {
 			name = u.Hostname()
 		}
 		if name == "" {
 			name = sub.Name
 		}
-		sv := SubscriptionView{Usage: sub.Usage, PreferenceID: sourceHash("panel-preferences/" + sub.URL), ID: sub.ID, Name: name, Host: host, IntervalSeconds: sub.IntervalSeconds, Nodes: []NodeView{}, UpdatedAt: sub.UpdatedAt, Error: sub.Error, Skipped: sub.Skipped}
+		sv := SubscriptionView{Direct: sub.Direct, Usage: sub.Usage, PreferenceID: sourceHash("panel-preferences/" + sub.URL), ID: sub.ID, Name: name, Host: host, IntervalSeconds: sub.IntervalSeconds, Nodes: []NodeView{}, UpdatedAt: sub.UpdatedAt, Error: sub.Error, Skipped: sub.Skipped}
 		for _, n := range sub.Nodes {
 			nv := viewNode(n)
 			if result, ok := results[sub.ID+"/"+n.ID]; ok {

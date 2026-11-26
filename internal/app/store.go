@@ -197,12 +197,51 @@ func (s *Store) LoadOrImport(env func(string) string) (State, error) {
 		}
 		configured = append(configured, sub)
 	}
+	// Direct links are one immutable local catalog, loaded only from the environment.
+	var directNodes []Node
+	directSeen := make(map[string]bool)
+	for index := 1; index <= 64; index++ {
+		key := fmt.Sprintf("SRV%d", index)
+		value := strings.TrimSpace(env(key))
+		if value == "" {
+			continue
+		}
+		if len(value) > 16384 || strings.ContainsAny(value, "\r\n") {
+			return state, fmt.Errorf("invalid direct server in %s", key)
+		}
+		node, parseErr := parseNode(value)
+		if parseErr != nil {
+			return state, fmt.Errorf("unsupported or invalid direct server in %s", key)
+		}
+		if directSeen[node.ID] {
+			continue
+		}
+		directSeen[node.ID] = true
+		directNodes = append(directNodes, node)
+	}
+	if len(directNodes) > 0 {
+		const directSource = "direct://servers"
+		direct := Subscription{ID: randomID(), Name: "Direct servers", URL: directSource, Direct: true, Nodes: directNodes}
+		for _, old := range previous.Subscriptions {
+			if old.Direct && old.URL == directSource {
+				direct.ID = old.ID
+				break
+			}
+		}
+		configured = append(configured, direct)
+	}
 	state.Subscriptions = configured
 	if len(configured) > 0 {
 		if state.Active != nil {
 			matched := false
 			for _, sub := range configured {
 				if state.Active.SubscriptionID == sub.ID && state.Active.SourceHash == sourceHash(sub.URL) {
+					if sub.Direct {
+						_, selectErr := SelectNode(sub.Nodes, "", state.Active.Node.ID)
+						if selectErr != nil {
+							break
+						}
+					}
 					matched = true
 					break
 				}

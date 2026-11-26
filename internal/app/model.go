@@ -35,6 +35,7 @@ type Node struct {
 	SpiderX     string            `json:"spiderX"`
 }
 type Subscription struct {
+	Direct          bool               `json:"direct,omitempty"`
 	Usage           *SubscriptionUsage `json:"usage,omitempty"`
 	Title           string             `json:"title,omitempty"`
 	EnvironmentName string             `json:"environmentName,omitempty"`

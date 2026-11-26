@@ -122,9 +122,10 @@ function render(){
  $('active-delay').className='active-delay'+(stale(lastGood,true)?' stale':'')+(activeResult&&!activeResult.reachable?' last-known':'');
  $('source-warning').hidden=!active?.sourceChanged;
  $('core-toggle').textContent=connected?'Stop':'Start';$('core-toggle').disabled=busy||!active;$('core-restart').disabled=busy||!active||!connected;
- const subscriptions=state.subscriptions,hasNodes=subscriptions.some(s=>s.nodes.length),probing=checking||state.probing;
- $('subscription-meta').textContent=`${subscriptions.length} ${subscriptions.length===1?'subscription':'subscriptions'} · ${subscriptions.reduce((n,s)=>n+s.nodes.length,0)} servers`;
- $('probe-servers').disabled=busy||probing||!hasNodes;$('probe-servers').textContent=probing?'Checking…':'Check all';
+ const subscriptions=state.subscriptions,hasNodes=subscriptions.some(s=>s.nodes.length),probing=checking||state.probing,probeBusy=checking||(state.probing&&!state.probingAutomatic);
+ const subCount=subscriptions.filter(s=>!s.direct).length;
+ $('subscription-meta').textContent=`${subCount} ${subCount===1?'subscription':'subscriptions'} · ${subscriptions.reduce((n,s)=>n+s.nodes.length,0)} servers`;
+ $('probe-servers').disabled=busy||probeBusy||!hasNodes;$('probe-servers').textContent=probing?'Checking…':'Check all';
  $('server-search').hidden=!hasNodes;$('switch-hint').hidden=!hasNodes;
  $('auto-check-interval').disabled=autoCheckUpdating;
  if(!autoCheckUpdating)$('auto-check-interval').value=String(state.probeIntervalSeconds??600);
@@ -136,7 +137,7 @@ function render(){
  const focusedKey=document.activeElement?.getAttribute?.('data-focus');
  const rows=$('server-list');rows.replaceChildren();const query=$('server-search').value.trim().toLocaleLowerCase('en');
  let visible=0;
- subscriptions.forEach((sub,index)=>{
+ [...subscriptions].sort((a,b)=>Number(!!b.direct)-Number(!!a.direct)).forEach((sub,index)=>{
   let nodes=sub.nodes.filter(n=>`${n.name} ${n.server}`.toLocaleLowerCase('en').includes(query)&&(preferences.filter!=='favorites'||preferences.favorites.includes(nodeKey(sub,n))));
   if((query||preferences.filter==='favorites')&&!nodes.length)return;
   if(preferences.sort==='latency')nodes=[...nodes].sort((a,b)=>(a.probe?.reachable?a.probe.milliseconds:Infinity)-(b.probe?.reachable?b.probe.milliseconds:Infinity));
@@ -149,8 +150,8 @@ function render(){
   appendSubscriptionUsage(info,sub);
   const actions=element('div','','source-actions');
   const refreshButton=element('button','↻','quiet');refreshButton.type='button';refreshButton.disabled=busy;refreshButton.title=`Refresh ${name} · ${updatedAt(sub)}`;refreshButton.setAttribute('aria-label',`Refresh ${name}`);refreshButton.addEventListener('click',()=>refresh(sub));
-  const check=element('button','Check','quiet');check.type='button';check.disabled=busy||probing||!sub.nodes.length;check.setAttribute('aria-label',`Check ${name}`);check.addEventListener('click',()=>checkServers({subscriptionID:sub.id}));
-  actions.append(refreshButton,check);heading.append(info,actions);group.append(heading);
+  const check=element('button','Check','quiet');check.type='button';check.disabled=busy||probeBusy||!sub.nodes.length;check.setAttribute('aria-label',`Check ${name}`);check.addEventListener('click',()=>checkServers({subscriptionID:sub.id}));
+  if(!sub.direct)actions.append(refreshButton);actions.append(check);heading.append(info,actions);group.append(heading);
   if(sub.error){const error=element('p',sub.error,'source-error');error.setAttribute('role','alert');group.append(error)}
   if(!collapsed){
    const list=element('div','','node-list');
@@ -161,7 +162,7 @@ function render(){
     const star=element('button',favorite?'★':'☆',`favorite${favorite?' selected':''}`);star.type='button';star.setAttribute('data-focus','favorite:'+nodeKey(sub,node));star.disabled=busy;star.setAttribute('aria-label',`${favorite?'Remove':'Add'} ${node.name} ${favorite?'from':'to'} favorites`);star.setAttribute('aria-pressed',String(favorite));star.addEventListener('click',()=>togglePreference('favorites',nodeKey(sub,node)));row.append(star);
     info.append(element('div',node.name,'server-name'),element('div',connectionType(node),'server-type'),element('div',`${node.server}:${node.port}`,'server-address'));row.append(info);
     const result=node.probe,pending=state.probing&&state.probingNode===sub.id+'/'+node.id||checking&&checkScope.nodeID===node.id&&checkScope.subscriptionID===sub.id;
-    const delay=element('button','',`server-delay${result&&!result.reachable?' unavailable':!result?' unknown':result.milliseconds>150?' slow':''}${stale(result,chosen&&connected)?' stale':''}`);delay.type='button';delay.setAttribute('data-focus','probe:'+nodeKey(sub,node));delay.disabled=busy||probing;delay.title='Check HTTPS latency through this VPN server';delay.setAttribute('aria-label',`Check ${node.name}`);
+    const delay=element('button','',`server-delay${result&&!result.reachable?' unavailable':!result?' unknown':result.milliseconds>150?' slow':''}${stale(result,chosen&&connected)?' stale':''}`);delay.type='button';delay.setAttribute('data-focus','probe:'+nodeKey(sub,node));delay.disabled=busy||probeBusy;delay.title='Check HTTPS latency through this VPN server';delay.setAttribute('aria-label',`Check ${node.name}`);
     const detail=pending?'Checking…':result?age(result.checkedAt):'Click to check';
     const history=Array.isArray(result?.history)?result.history.slice(-5):[];
     const strip=element('div','','probe-history');strip.setAttribute('role','img');
@@ -188,7 +189,7 @@ function render(){
   rows.append(group);
  });
  if(!visible&&(query||preferences.filter==='favorites'))rows.append(element('p',preferences.filter==='favorites'?'No favorite servers match.':'No servers found.','empty'));
- if(!subscriptions.length)rows.append(element('p','Set SUBSCRIPTION_URL in the container environment and restart the container.','empty'));
+ if(!subscriptions.length)rows.append(element('p','Set SUBSCRIPTION_URL or SRV1 in the container environment and restart the container.','empty'));
  if(focusedKey){const target=Array.from(rows.querySelectorAll?.('[data-focus]')||[]).find(e=>e.getAttribute('data-focus')===focusedKey);if(target&&!target.disabled)target.focus({preventScroll:true})}
  $('logs').textContent=state.logs.map(entry=>`${new Date(entry.time).toLocaleTimeString('en-GB')}  ${entry.message}`).join('\n')||'No events yet.';
  $('core-version').textContent=state.coreVersion?'Xray '+state.coreVersion:'';
@@ -199,7 +200,7 @@ $('logout').addEventListener('click',async()=>{try{await api('/logout',{method:'
 $('core-toggle').addEventListener('click',()=>{const running=state?.running;action(()=>api(`/xray/${running?'stop':'start'}`,{method:'POST',body:{}}),running?'Xray stopped':'Xray started',running?'Stopping Xray…':'Starting Xray…')});
 $('core-restart').addEventListener('click',()=>action(()=>api('/xray/restart',{method:'POST',body:{}}),'Xray restarted','Restarting Xray…'));
 async function checkServers(scope={}){
- if(busy||checking||state?.probing)return;
+ if(busy||checking||(state?.probing&&!state?.probingAutomatic))return;
  const controller=new AbortController();probeController=controller;checking=true;checkScope=scope;render();notice('Checking servers through VPN…');
  try{
   await api('/probe',{method:'POST',body:scope,signal:controller.signal});

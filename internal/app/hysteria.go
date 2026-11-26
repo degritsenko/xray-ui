@@ -42,7 +42,7 @@ func parseHysteria(u *url.URL) (Node, error) {
 			return Node{}, bad
 		}
 		switch k {
-		case "sni", "insecure", "obfs", "obfs-password", "alpn", "security", "fm":
+		case "sni", "peer", "insecure", "obfs", "obfs-password", "alpn", "security", "fm":
 		default:
 			return Node{}, bad
 		}
@@ -99,8 +99,15 @@ func parseHysteria(u *url.URL) (Node, error) {
 	} else if q.Get("obfs-password") != "" {
 		return Node{}, bad
 	}
+	sni, peer := q.Get("sni"), q.Get("peer")
+	if sni != "" && peer != "" && sni != peer {
+		return Node{}, bad
+	}
+	if sni == "" {
+		sni = peer
+	}
 	n := Node{Protocol: "hysteria2", Hysteria: h, Network: "hysteria", Security: "tls",
-		Name: u.Fragment, Server: u.Hostname(), Port: port, SNI: q.Get("sni")}
+		Name: u.Fragment, Server: u.Hostname(), Port: port, SNI: sni}
 	if n.Name == "" {
 		n.Name = n.Server
 	}

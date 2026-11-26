@@ -18,11 +18,91 @@ var allowedParameters = map[string]bool{"security": true, "type": true, "flow": 
 func validText(s string) bool {
 	return utf8.ValidString(s) && strings.IndexFunc(s, unicode.IsControl) < 0
 }
+
+// normalizeShadowrocketVLESS handles the Base64 none:UUID@host:port format.
+func normalizeShadowrocketVLESS(u *url.URL) (string, error) {
+	bad := errors.New("unsupported or invalid entry")
+	if u.User != nil || u.Opaque != "" || u.Path != "" || u.Host == "" || len(u.Host) > 8192 {
+		return "", bad
+	}
+	var decoded []byte
+	var err error
+	for _, enc := range []*base64.Encoding{base64.RawURLEncoding, base64.URLEncoding, base64.RawStdEncoding, base64.StdEncoding} {
+		decoded, err = enc.DecodeString(u.Host)
+		if err == nil {
+			break
+		}
+	}
+	if err != nil || !validText(string(decoded)) || !strings.HasPrefix(string(decoded), "none:") {
+		return "", bad
+	}
+	endpoint, err := url.Parse("vless://" + strings.TrimPrefix(string(decoded), "none:"))
+	if err != nil || endpoint.User == nil || endpoint.Opaque != "" || endpoint.Path != "" || endpoint.RawQuery != "" || endpoint.Fragment != "" {
+		return "", bad
+	}
+	q, err := url.ParseQuery(u.RawQuery)
+	if err != nil {
+		return "", bad
+	}
+	for k, values := range q {
+		if len(values) != 1 || !validText(values[0]) {
+			return "", bad
+		}
+		switch k {
+		case "path", "remarks", "obfs", "tls", "peer", "alpn", "udp", "fingerprint", "xtls", "pbk", "sid":
+		default:
+			return "", bad
+		}
+	}
+	if q.Get("tls") != "1" {
+		return "", bad
+	}
+	if udp := q.Get("udp"); udp != "" && udp != "1" {
+		return "", bad
+	}
+	var params url.Values
+	switch q.Get("obfs") {
+	case "grpc":
+		if q.Get("path") == "" || q.Get("xtls") != "" || q.Get("pbk") != "" || q.Get("sid") != "" {
+			return "", bad
+		}
+		params = url.Values{"type": {"grpc"}, "security": {"tls"}, "serviceName": {q.Get("path")}}
+	case "", "none":
+		if q.Get("xtls") != "2" || q.Get("pbk") == "" || q.Get("peer") == "" || q.Get("path") != "" || q.Get("alpn") != "" {
+			return "", bad
+		}
+		params = url.Values{"type": {"tcp"}, "security": {"reality"}, "flow": {"xtls-rprx-vision"}, "pbk": {q.Get("pbk")}}
+		if sid := q.Get("sid"); sid != "" {
+			params.Set("sid", sid)
+		}
+	default:
+		return "", bad
+	}
+	for from, to := range map[string]string{"peer": "sni", "alpn": "alpn", "fingerprint": "fp"} {
+		if value := q.Get(from); value != "" {
+			params.Set(to, value)
+		}
+	}
+	endpoint.RawQuery = params.Encode()
+	endpoint.Fragment = u.Fragment
+	if endpoint.Fragment == "" {
+		endpoint.Fragment = q.Get("remarks")
+	}
+	return endpoint.String(), nil
+}
+
 func parseNode(line string) (Node, error) {
 	bad := errors.New("unsupported or invalid entry")
 	u, err := url.Parse(line)
 	if err == nil && (u.Scheme == "hy2" || u.Scheme == "hysteria2") {
 		return parseHysteria(u)
+	}
+	if err == nil && u.Scheme == "vless" && u.User == nil {
+		normalized, normalizeErr := normalizeShadowrocketVLESS(u)
+		if normalizeErr != nil {
+			return Node{}, bad
+		}
+		u, err = url.Parse(normalized)
 	}
 	if err != nil || u.Scheme != "vless" || u.User == nil || u.Opaque != "" || u.Path != "" {
 		return Node{}, bad

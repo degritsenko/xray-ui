@@ -200,7 +200,7 @@ func (s *Store) LoadOrImport(env func(string) string) (State, error) {
 	// Direct links are one immutable local catalog, loaded only from the environment.
 	var directNodes []Node
 	directSeen := make(map[string]bool)
-	for index := 1; index <= 64; index++ {
+	for index := 1; index <= 16; index++ {
 		key := fmt.Sprintf("SRV%d", index)
 		value := strings.TrimSpace(env(key))
 		if value == "" {

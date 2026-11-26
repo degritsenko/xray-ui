@@ -11,7 +11,7 @@ Platforms: **Linux AMD64, ARM64, ARMv7 and ARMv5**. Xray 26.11.9.
 
 The dark panel includes favorites, latency sorting, automatic HTTPS checks and the last five check results per server. Subscription traffic, quota and expiry are shown when reported by the provider. Failed checks retain the last successful latency; subscription errors stay beside the affected source.
 
-![xray-ui panel](docs/panel.png?v=ui-13)
+![xray-ui panel](docs/panel.png)
 
 ## Run on MikroTik
 
@@ -54,7 +54,7 @@ Edit existing entries instead of duplicating them. Configure firewall, NAT, gate
 |---|---|
 | `SUBSCRIPTION_URL` | `https://provider.example/sub/YOUR_TOKEN` |
 | `SUBSCRIPTION_URL_2` | `https://another-provider.example/sub/YOUR_TOKEN` (optional; up to `_16`) |
-| `SRV1`, `SRV2` … `SRV64` | Direct `vless://`, `hysteria2://` or `hy2://` links (optional) |
+| `SRV1`, `SRV2` … `SRV16` | Direct `vless://`, `hysteria2://` or `hy2://` links (optional) |
 | `PANEL_PASSWORD` | `REPLACE_WITH_YOUR_PASSWORD` |
 | `SUBSCRIPTION_REFRESH_SECONDS` | `600` (10 minutes, default) |
 | `PANEL_ADDRESS` | `0.0.0.0:8080` |
@@ -68,7 +68,7 @@ Edit existing entries instead of duplicating them. Configure firewall, NAT, gate
 
 Subscriptions accept plain-text or Base64 lists of supported VLESS and Hysteria2 links. VLESS supports TCP/RAW + REALITY (including Vision), XHTTP + REALITY/TLS/none and gRPC + REALITY/TLS. Source names come from `profile-title`, falling back to the subscription hostname.
 
-Direct links in `SRV1`–`SRV64` appear under **Direct servers**, before subscriptions. Standard `vless://`, `hysteria2://` and `hy2://` links are supported, as are Base64 VLESS links for gRPC + TLS or TCP + REALITY + Vision. Direct links are read at startup; change the environment variable and restart the container to update one.
+Direct links in `SRV1`–`SRV16` appear under **Direct servers**, before subscriptions. Standard `vless://`, `hysteria2://` and `hy2://` links are supported, as are Base64 VLESS links for gRPC + TLS or TCP + REALITY + Vision. Direct links are read at startup; change the environment variable and restart the container to update one.
 
 Hysteria2 supports `sni` or `peer` for TLS and optional Salamander obfuscation. It requires outbound UDP and a valid TLS certificate. Insecure TLS, port hopping and certificate pins such as `hpkp` are not supported.
 
